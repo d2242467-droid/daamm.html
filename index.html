@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Doom: BOSS UPDATE - Vibe Coding</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: #111; color: white; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        canvas { border: 4px solid #555; background: #000; box-shadow: 0 0 30px rgba(255, 0, 100, 0.4); cursor: crosshair; }
+        #ui { margin-top: 10px; font-size: 18px; text-shadow: 2px 2px black; color: #ff3333; font-weight: bold; letter-spacing: 2px; text-align: center; width: 800px; display: flex; justify-content: space-between; }
+        #boss-ui { color: #ff00ff; font-size: 22px; text-align: center; width: 800px; margin-bottom: 5px; font-weight: bold; display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="boss-ui">⚠ WARNING: BOSS ALIVE (HP: <span id="boss-hp">30</span>/30) ⚠</div>
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+    <div id="ui">
+        <div>HEALTH: <span id="health-val">100</span>%</div>
+        <div>WEAPON: <span id="weapon-name" style="color: #fff;">SHOTGUN [1]</span></div>
+        <div>AMMO: <span id="ammo-val">100</span> <span id="reload-msg" style="color: yellow;"></span></div>
+        <div>SCORE: <span id="score-val">0</span></div>
+    </div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const ammoUi = document.getElementById("ammo-val");
+const healthUi = document.getElementById("health-val");
+const scoreUi = document.getElementById("score-val");
+const weaponUi = document.getElementById("weapon-name");
+const bossUi = document.getElementById("boss-ui");
+const bossHpUi = document.getElementById("boss-hp");
+const reloadUi = document.getElementById("reload-msg");
+
+// 1. Огромная карта 32x32
+const mapSize = 32;
+const map = [
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,2,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,2,0,0,2,0,2,2,2,2,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,0,0,0,0,0,0,0,0,2,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,0,2,2,2,2,2,0,0,2,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,2,0,0,0,2,0,0,0,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,0,2,0,0,0,2,0,2,2,2,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,0,2,2,0,2,2,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,0,0,0,0,0,0,0,2,2,2,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,2,2,2,2,2,2,0,2,0,2,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,2,0,2,0,2,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,2,2,0,2,0,2,0,2,0,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,0,0,0,2,0,0,0,2,2,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,0,2,2,2,2,2,2,2,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,3,3,3,0,1,0,4,4,4,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,3,0,3,0,1,0,4,0,4,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,3,3,3,0,1,0,4,4,4,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,1,1,1,1,1,0,1,1,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,5,5,5,0,1,0,2,2,2,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,5,0,5,0,0,0,2,0,2,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,5,5,5,0,1,0,2,2,2,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+];
+
+// Игрок
+let playerX = 3.5;
+let playerY = 3.5;
+let playerAngle = 0.0;
+let health = 100;
+let score = 0;
+
+const FOV = Math.PI / 3;
+const HALF_FOV = FOV / 2;
+const numRays = canvas.width;
+const renderDistance = 32; 
+const depthBuffer = new Array(numRays);
+
+// Оружие и инвентарь
+let currentWeapon = 'shotgun'; // 'shotgun' или 'rifle'
+let ammo = 100;
+let rifleClip = 30; // Обойма винтовки
+let isShooting = false;
+let shootTimer = 0;
+let walkCycle = 0;
+let isMoving = false;
+
+// Таймеры для винтовки
+let rifleFireRateTimer = 0;
+let isReloading = false;
+let reloadTimer = 0;
+
+// Враги и таймеры спавна
+let enemies = [];
+let regularSpawnTimer = 0;
+let bossSpawnTimer = 0;
+let hasBoss = false;
+
+function spawnEnemy(isBoss = false) {
+    let spawned = false;
+    let attempts = 0;
+    while (!spawned && attempts < 100) {
+        attempts++;
+        let rx = Math.floor(Math.random() * mapSize);
+        let ry = Math.floor(Math.random() * mapSize);
+        
+        if (map[ry * mapSize + rx] === 0 && Math.hypot(rx - playerX, ry - playerY) > 5) {
+            if (isBoss) {
+                enemies.push({
+                    x: rx + 0.5, y: ry + 0.5,
+                    type: 'boss', health: 30, speed: 2.0, size: 0.8
+                });
+                hasBoss = true;
+                bossUi.style.display = "block";
+                bossHpUi.innerText = 30;
+            } else {
+                let type = Math.random() > 0.5 ? 'creeper' : 'skeleton';
+                enemies.push({
+                    x: rx + 0.5, y: ry + 0.5, type: type,
+                    health: type === 'creeper' ? 2 : 3,
+                    speed: type === 'creeper' ? 1.5 : 1.1, size: 0.4
+                });
+            }
+            spawned = true;
+        }
+    }
+}
+
+// Стартовые враги
+for(let i=0; i<6; i++) spawnEnemy(false);
+
+// Управление клавиатурой
+const keys = {};
+window.addEventListener('keydown', e => {
+    keys[e.code] = true;
+    if (e.code === 'Digit1') { currentWeapon = 'shotgun'; weaponUi.innerText = "SHOTGUN [1]"; reloadUi.innerText = ""; }
+    if (e.code === 'Digit2') { currentWeapon = 'rifle'; weaponUi.innerText = `RIFLE [2] (${rifleClip}/30)`; }
+});
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+// Клик / зажатие мыши
+let isMouseDown = false;
+canvas.addEventListener('mousedown', () => isMouseDown = true);
+window.addEventListener('mouseup', () => isMouseDown = false);
+
+function executeShot() {
+    if (health <= 0) return;
+
+    if (currentWeapon === 'shotgun') {
+        if (!isShooting && ammo > 0) {
+            isShooting = true;
+            shootTimer = 0;
+            ammo--;
+            ammoUi.innerText = ammo;
+            checkHit(0.18, 1);
+        }
+    } else if (currentWeapon === 'rifle') {
+        if (!isReloading && rifleClip > 0 && ammo > 0 && rifleFireRateTimer <= 0) {
+            isShooting = true;
+            shootTimer = 0;
+            rifleClip--;
+            ammo--;
+            ammoUi.innerText = ammo;
+            weaponUi.innerText = `RIFLE [2] (${rifleClip}/30)`;
+            rifleFireRateTimer = 0.12; // Задержка между выстрелами винтовки (быстро)
+            checkHit(0.08, 1);
+
+            if (rifleClip <= 0 && ammo > 0) {
+                startRifleReload();
+            }
+        }
+    }
+}
+
+function startRifleReload() {
+    isReloading = true;
+    reloadTimer = 2.0; // 2 секунды перезарядки
+    reloadUi.innerText = "(RELOADING...)";
+}
+
+function checkHit(fovSpread, damage) {
+    let hitTarget = null;
+    let minEnemyDist = Infinity;
+
+    enemies.forEach(enemy => {
+        let enemyAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX) - playerAngle;
+        while (enemyAngle < -Math.PI) enemyAngle += Math.PI * 2;
+        while (enemyAngle > Math.PI) enemyAngle -= Math.PI * 2;
+
+        if (Math.abs(enemyAngle) < fovSpread) {
+            let dist = Math.hypot(enemy.x - playerX, enemy.y - playerY);
+            let checkX = Math.floor(playerX + Math.cos(playerAngle) * dist);
+            let checkY = Math.floor(playerY + Math.sin(playerAngle) * dist);
+            
+            if (dist < minEnemyDist && map[checkY * mapSize + checkX] === 0) {
+                minEnemyDist = dist;
+                hitTarget = enemy;
+            }
+        }
+    });
+
+    if (hitTarget) {
+        hitTarget.health -= damage;
+        if (hitTarget.type === 'boss') {
+            bossHpUi.innerText = Math.max(0, hitTarget.health);
+        }
+        hitTarget.x -= Math.cos(playerAngle) * 0.15;
+        hitTarget.y -= Math.sin(playerAngle) * 0.15;
+    }
+}
+
+function update(dt) {
+    if (health <= 0) return;
+
+    // Считывание непрерывной стрельбы (для зажатого пробела или мыши)
+    if (isMouseDown || keys['Space']) {
+        executeShot();
+    }
+
+    const moveSpeed = 4.0 * dt;
+    const rotSpeed = 2.4 * dt;
+
+    if (keys['KeyA'] || keys['ArrowLeft'])  playerAngle -= rotSpeed;
+    if (keys['KeyD'] || keys['ArrowRight']) playerAngle += rotSpeed;
+
+    let newX = playerX;
+    let newY = playerY;
+    isMoving = false;
+
+    if (keys['KeyW'] || keys['ArrowUp']) { newX += Math.cos(playerAngle) * moveSpeed; newY += Math.sin(playerAngle) * moveSpeed; isMoving = true; }
+    if (keys['KeyS'] || keys['ArrowDown']) { newX -= Math.cos(playerAngle) * moveSpeed; newY -= Math.sin(playerAngle) * moveSpeed; isMoving = true; }
+
+    if (map[Math.floor(playerY) * mapSize + Math.floor(newX)] === 0) playerX = newX;
+    if (map[Math.floor(newY) * mapSize + Math.floor(playerX)] === 0) playerY = newY;
+
+    // Логика оружия
+    if (rifleFireRateTimer > 0) rifleFireRateTimer -= dt;
+    
+    if (isShooting) {
+        shootTimer += dt * 15;
+        if (shootTimer > 4) isShooting = false;
+    }
+    walkCycle += isMoving ? dt * 12 : 0;
+
+    if (isReloading) {
+        reloadTimer -= dt;
+        if (reloadTimer <= 0) {
+            isReloading = false;
+            let toLoad = Math.min(30, ammo);
+            rifleClip = toLoad;
+            reloadUi.innerText = "";
+            if (currentWeapon === 'rifle') weaponUi.innerText = `RIFLE [2] (${rifleClip}/30)`;
+        }
+    }
+
+    // ТАЙМЕРЫ СПАВНА
+    regularSpawnTimer += dt;
+    if (regularSpawnTimer >= 30) {
+        spawnEnemy(false); spawnEnemy(false);
+        regularSpawnTimer = 0;
+        ammo = Math.min(200, ammo + 30);
+        ammoUi.innerText = ammo;
+    }
+
+    // Спавн БОССА каждые 3 минуты (180 секунд)
+    bossSpawnTimer += dt;
+    if (bossSpawnTimer >= 180) {
+        spawnEnemy(true);
+        bossSpawnTimer = 0;
+    }
+
+    // Движение врагов
+    enemies = enemies.filter(enemy => {
+        if (enemy.health <= 0) {
+            if (enemy.type === 'boss') {
+                score += 2000;
+                hasBoss = false;
+                bossUi.style.display = "none";
+            } else {
+                score += enemy.type === 'creeper' ? 100 : 200;
+            }
+            scoreUi.innerText = score;
+            return false;
+        }
+
+        let dx = playerX - enemy.x;
+        let dy = playerY - enemy.y;
+        let dist = Math.hypot(dx, dy);
+
+        if (dist < 20 && dist > 0.3) {
+            let moveX = enemy.x + (dx / dist) * enemy.speed * dt;
+            let moveY = enemy.y + (dy / dist) * enemy.speed * dt;
+            if (map[Math.floor(enemy.y) * mapSize + Math.floor(moveX)] === 0) enemy.x = moveX;
+            if (map[Math.floor(moveY) * mapSize + Math.floor(enemy.x)] === 0) enemy.y = moveY;
+        }
+
+        if (dist <= 0.6) {
+            if (enemy.type === 'creeper') {
+                health -= 45; enemy.health = 0; 
+            } else if (enemy.type === 'boss') {
+                health -= 40 * dt; // Босс наносит огромный урон в секунду
+            } else {
+                health -= 12 * dt; 
+            }
+            health = Math.max(0, Math.floor(health));
+            healthUi.innerText = health;
+        }
+        return true;
+    });
+}
+
+function getWallColors(wallType, yPixel, wallHeight) {
+    let ratio = Math.floor((yPixel / wallHeight) * 8); 
+    let isEvenRow = ratio % 2 === 0;
+    switch(wallType) {
+        case 2: return isEvenRow ? ["#555555", "#444444"] : ["#b31a1a", "#801010"];
+        case 3: return isEvenRow ? ["#666666", "#555555"] : ["#1eb31a", "#116610"];
+        case 4: return isEvenRow ? ["#1eb31a", "#116610"] : ["#1a5cb3", "#103870"];
+        case 5: return isEvenRow ? ["#1a5cb3", "#103870"] : ["#b31a1a", "#801010"];
+        default: return isEvenRow ? ["#333333", "#222222"] : ["#777777", "#555555"];
+    }
+}
+
+function render() {
+    ctx.fillStyle = "#0c0512"; ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
+    ctx.fillStyle = "#170f0d"; ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
+
+    // РЕНДЕР СТЕН
+    const startAngle = playerAngle - HALF_FOV;
+    const rayStep = FOV / numRays;
+
+    for (let i = 0; i < numRays; i++) {
+        let angle = startAngle + i * rayStep;
+        let distance = 0; let hitWall = false; let wallType = 1;
+        let cos = Math.cos(angle); let sin = Math.sin(angle);
+
+        while (!hitWall && distance < renderDistance) {
+            distance += 0.03;
+            let checkX = Math.floor(playerX + cos * distance);
+            let checkY = Math.floor(playerY + sin * distance);
+            if (checkX < 0 || checkX >= mapSize || checkY < 0 || checkY >= mapSize) {
+                hitWall = true; distance = renderDistance; wallType = 1;
+            } else {
+                let cell = map[checkY * mapSize + checkX];
+                if (cell > 0) { hitWall = true; wallType = cell; }
+            }
+        }
+
+        let correctedDistance = distance * Math.cos(angle - playerAngle);
+        depthBuffer[i] = correctedDistance;
+
+        let wallHeight = Math.min(canvas.height, (canvas.height / correctedDistance));
+        let startY = (canvas.height / 2) - (wallHeight / 2);
+        let segments = 8;
+        let shadow = Math.max(0.05, 1 - (correctedDistance / renderDistance));
+
+        for (let s = 0; s < segments; s++) {
+            let segStart = Math.max(0, startY + (wallHeight / segments) * s);
+            let segEnd = Math.min(canvas.height, startY + (wallHeight / segments) * (s + 1));
+            let colors = getWallColors(wallType, s * (wallHeight/segments), wallHeight);
+
+            ctx.save();
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = colors[0];
+            ctx.beginPath(); ctx.lineWidth = 1.2; ctx.moveTo(i, segStart); ctx.lineTo(i, segEnd); ctx.stroke();
+            
+            ctx.strokeStyle = "black"; ctx.globalAlpha = 1 - shadow;
+            ctx.beginPath(); ctx.moveTo(i, segStart); ctx.lineTo(i, segEnd); ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    // РЕНДЕР ВРАГОВ
+    enemies
+        .map(e => ({ ...e, dist: Math.hypot(e.x - playerX, e.y - playerY) }))
+        .sort((a, b) => b.dist - a.dist)
+        .forEach(enemy => {
+            let spriteAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX) - playerAngle;
+            while (spriteAngle < -Math.PI) spriteAngle += Math.PI * 2;
+            while (spriteAngle > Math.PI) spriteAngle -= Math.PI * 2;
+
+            if (Math.abs(spriteAngle) < HALF_FOV + 0.2) {
+                let spriteScreenHeight = Math.min(canvas.height, (canvas.height / enemy.dist));
+                let screenX = Math.tan(spriteAngle) * (canvas.width / 2) + (canvas.width / 2);
+                let screenY = (canvas.height / 2) + (spriteScreenHeight / 2);
+                let spriteWidth = spriteScreenHeight * enemy.size * 2;
+
+                ctx.save();
+                ctx.translate(screenX, screenY);
+                
+                let centerRayIndex = Math.floor(screenX);
+                if (centerRayIndex >= 0 && centerRayIndex < canvas.width && enemy.dist < depthBuffer[centerRayIndex]) {
+                    if (enemy.type === 'boss') {
+                        // Коронованный Огненный Босс
+                        ctx.fillStyle = "#ff0055"; // Яркая основа
+                        ctx.fillRect(-spriteWidth/2, -spriteScreenHeight, spriteWidth, spriteScreenHeight);
+                        // Золотая корона
+                        ctx.fillStyle = "#ffd700";
+                        ctx.fillRect(-spriteWidth/2, -spriteScreenHeight - spriteScreenHeight/6, spriteWidth, spriteScreenHeight/6);
+                        // Огромные светящиеся глаза
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillRect(-spriteWidth/3, -spriteScreenHeight + spriteScreenHeight/4, spriteWidth/4, spriteScreenHeight/5);
+                        ctx.fillRect(spriteWidth/12, -spriteScreenHeight + spriteScreenHeight/4, spriteWidth/4, spriteScreenHeight/5);
+                    } else if (enemy.type === 'creeper') {
+                        ctx.fillStyle = "#111111";
+                        ctx.fillRect(-spriteWidth/2, -spriteScreenHeight, spriteWidth, spriteScreenHeight);
+                        ctx.fillStyle = "#ff2222";
+                        ctx.fillRect(-spriteWidth/4, -spriteScreenHeight + spriteScreenHeight/5, spriteWidth/5, spriteScreenHeight/5);
+                        ctx.fillRect(spriteWidth/12, -spriteScreenHeight + spriteScreenHeight/5, spriteWidth/5, spriteScreenHeight/5);
+                    } else {
+                        ctx.fillStyle = "#7b1fa2";
+                        ctx.fillRect(-spriteWidth/2, -spriteScreenHeight, spriteWidth, spriteScreenHeight);
+                        ctx.fillStyle = "#00ffff";
+                        ctx.fillRect(-spriteWidth/4, -spriteScreenHeight + spriteScreenHeight/5, spriteWidth/6, spriteScreenHeight/6);
+                        ctx.fillRect(spriteWidth/12, -spriteScreenHeight + spriteScreenHeight/5, spriteWidth/6, spriteScreenHeight/6);
+                    }
+                }
+                ctx.restore();
+            }
+        });
+
+    // РЕНДЕР ОРУЖИЯ И АНИМАЦИЙ ВСПЫШЕК
+    if (health > 0) {
+        let gunX = canvas.width / 2;
+        let gunY = canvas.height;
+
+        if (isMoving && !isShooting) {
+            gunX += Math.sin(walkCycle) * 12;
+            gunY += Math.abs(Math.cos(walkCycle)) * 8 - 4;
+        }
+
+        if (isShooting) {
+            gunY += (currentWeapon === 'shotgun') ? (shootTimer < 1.5 ? 30 : -15) : (Math.sin(shootTimer * 4) * 5);
+            
+            // Вспышка (Muzzle Flash)
+            if (shootTimer < 2) {
+                ctx.fillStyle = currentWeapon === 'shotgun' ? "rgba(255, 180, 0, 0.9)" : "rgba(0, 255, 200, 0.9)";
+                ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2 + (currentWeapon === 'shotgun' ? 50 : 20), currentWeapon === 'shotgun' ? 50 : 25, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+
+        if (isReloading) {
+            gunY += 80; // Спрятать оружие вниз во время перезарядки
+        }
+
+        if (currentWeapon === 'shotgun') {
+            // Отрисовка дробовика
+            ctx.fillStyle = "#3a3a3a"; ctx.fillRect(gunX - 30, gunY - 160, 25, 170); ctx.fillRect(gunX + 5, gunY - 160, 25, 170);
+            ctx.fillStyle = "#000"; ctx.fillRect(gunX - 25, gunY - 160, 15, 12); ctx.fillRect(gunX + 10, gunY - 160, 15, 12);
+            ctx.fillStyle = "#5c4033"; ctx.fillRect(gunX - 35, gunY - 70, 70, 80);
+        } else {
+            // Отрисовка Штурмовой винтовки (Стиль хай-тек автомата)
+            ctx.fillStyle = "#222"; 
+            ctx.fillRect(gunX - 10, gunY - 210, 20, 220); // Длинный ствол винтовки по центру
+            ctx.fillStyle = "#00ffcc"; 
+            ctx.fillRect(gunX - 4, gunY - 190, 8, 80); // Светящийся лазерный прицел/плазмопровод
+            ctx.fillStyle = "#444"; 
+            ctx.fillRect(gunX - 20, gunY - 90, 40, 100); // Ствольная коробка
+        }
+    } else {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ff3333"; ctx.font = "bold 45px monospace"; ctx.textAlign = "center"; ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+    }
+}
+
+let lastTime = performance.now();
+function gameLoop(currentTime) {
+    let dt = (currentTime - lastTime) / 1000;
+    lastTime = currentTime;
+    update(dt);
+    render();
+    requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
