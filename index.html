@@ -228,7 +228,12 @@
                <b>Клавиша E</b> — Открыть/Закрыть Магазин Улучшений<br>
                <b>Цифры 1, 2, 3</b> — Смена оружия (автомат и ракетницу нужно сначала купить)
             </p>
-            <button class="btn" onclick="startGame()">ИГРАТЬ</button>
+            <p style="color:#e0aaff; margin-bottom:8px;">Выберите сложность:</p>
+            <div style="display:flex; gap:12px; margin-bottom:8px;">
+                <button class="btn" style="background:#2b6b2b; box-shadow:0 5px 0 #164016; font-size:16px; padding:10px 22px;" onclick="startGame('EASY')">ЛЕГКО</button>
+                <button class="btn" style="background:#b38600; box-shadow:0 5px 0 #664c00; font-size:16px; padding:10px 22px;" onclick="startGame('MEDIUM')">СРЕДНЕ</button>
+                <button class="btn" style="background:#ff2a2a; box-shadow:0 5px 0 #990000; font-size:16px; padding:10px 22px;" onclick="startGame('HARD')">СЛОЖНО</button>
+            </div>
         </div>
 
         <!-- Экран Магазина -->
@@ -291,6 +296,7 @@
         <div>ОРУЖИЕ: <span id="weapon-name" style="color: #fff;">ДРОБОВИК [1]</span></div>
         <div>ПАТРОНЫ: <span id="ammo-val">100</span> <span id="reload-msg" style="color: yellow;"></span></div>
         <div>СЧЕТ: <span id="score-val">0</span></div>
+        <div>СЛОЖНОСТЬ: <span id="difficulty-val" style="color:#ffd700;">ЛЕГКО</span></div>
         <div><button onclick="toggleShop()" class="shop-btn-small">МАГАЗИН (E)</button></div>
     </div>
 
@@ -312,35 +318,35 @@ let gameState = 'START';
 const mapSize = 32;
 const map = [
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,0,0,0,0,0,2,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,2,0,0,2,0,2,2,2,2,0,2,0,1,0,6,6,6,6,6,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,0,0,0,0,0,0,0,0,2,0,2,0,1,0,6,0,0,0,6,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,0,2,2,2,2,2,0,0,2,0,2,0,1,0,6,0,0,0,6,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,2,0,0,0,2,0,0,0,0,2,0,1,0,6,6,6,6,6,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,0,2,0,0,0,2,0,2,2,2,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,0,2,2,0,2,2,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,0,0,0,0,0,0,0,2,2,2,0,0,1,0,6,6,6,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,2,2,2,2,2,2,0,2,0,2,2,0,1,0,6,0,6,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,2,0,2,0,2,2,0,1,0,6,6,6,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,2,2,0,2,0,2,0,2,0,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,0,0,0,2,0,0,0,2,2,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,0,2,2,2,2,2,2,2,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,3,3,3,0,1,0,4,4,4,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,3,0,1,0,4,0,4,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,3,3,3,0,1,0,4,4,4,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,1,1,1,1,1,0,1,1,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,5,5,5,0,1,0,2,2,2,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,5,0,5,0,0,0,2,0,2,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,5,5,5,0,1,0,2,2,2,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,0,0,0,5,5,2,0,0,2,5,5,0,0,0,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,2,2,2,5,5,0,0,0,0,5,5,2,2,2,0,0,0,0,0,2,2,0,1,
+    1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,1,
+    1,0,0,0,4,4,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,4,4,0,0,0,1,
+    1,0,1,0,4,4,0,0,5,5,0,0,0,5,5,0,0,5,5,0,0,0,5,5,0,0,4,4,0,1,0,1,
+    1,0,0,0,0,0,2,2,2,0,0,0,0,5,0,0,0,0,5,0,0,0,0,2,2,2,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,0,0,0,0,5,0,0,0,0,5,0,0,0,0,2,2,2,0,0,0,0,0,1,
+    1,0,1,0,4,4,0,0,5,5,0,0,0,5,5,0,0,5,5,0,0,0,5,5,0,0,4,4,0,1,0,1,
+    1,0,0,0,4,4,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,4,4,0,0,0,1,
+    1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,
+    1,0,2,2,0,0,0,0,0,2,2,2,5,5,0,0,0,0,5,5,2,2,2,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,0,0,0,5,5,2,0,0,2,5,5,0,0,0,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 ];
@@ -359,6 +365,14 @@ let playerVelZ = 0;
 let isOnGround = true;
 const GRAVITY = 20.0;
 const JUMP_VELOCITY = 8.0;
+
+// === НАСТРОЙКИ СЛОЖНОСТИ ===
+const DIFFICULTY_SETTINGS = {
+    EASY:   { label: "ЛЕГКО",  spawnInterval: 20, creeperHp: 50,  skeletonHp: 100, flyerHp: 100, bossHp: 1000, flyingEnemies: false, flyingBoss: false },
+    MEDIUM: { label: "СРЕДНЕ", spawnInterval: 10, creeperHp: 200, skeletonHp: 200, flyerHp: 200, bossHp: 2000, flyingEnemies: true,  flyingBoss: false },
+    HARD:   { label: "СЛОЖНО",spawnInterval: 10, creeperHp: 500, skeletonHp: 500, flyerHp: 500, bossHp: 5000, flyingEnemies: true,  flyingBoss: true  }
+};
+let difficulty = 'EASY';
 
 // Оружие и Прогресс Магазина
 let weaponsUnlocked = {
@@ -887,6 +901,7 @@ function spawnExplosion(x, y, z = 0) {
 }
 
 function spawnEnemy(isBoss = false) {
+    const settings = DIFFICULTY_SETTINGS[difficulty];
     let spawned = false;
     let attempts = 0;
     while (!spawned && attempts < 150) {
@@ -896,19 +911,32 @@ function spawnEnemy(isBoss = false) {
         
         if (map[ry * mapSize + rx] === 0 && Math.hypot(rx - playerX, ry - playerY) > 6) {
             if (isBoss) {
+                const bossHp = settings.bossHp;
                 enemies.push({
-                    x: rx + 0.5, y: ry + 0.5,
-                    type: 'boss', health: 1000, maxHealth: 1000, speed: 2.1, size: 1.3
+                    x: rx + 0.5, y: ry + 0.5, z: 0,
+                    type: 'boss', health: bossHp, maxHealth: bossHp, speed: 2.1, size: 1.3,
+                    isFlying: settings.flyingBoss, hoverPhase: Math.random() * Math.PI * 2
                 });
                 hasBoss = true;
                 bossUi.style.display = "block";
-                bossHpUi.innerText = 1000;
+                bossHpUi.innerText = bossHp;
             } else {
-                let type = Math.random() > 0.5 ? 'creeper' : 'skeleton';
-                if (type === 'creeper') {
-                    enemies.push({ x: rx + 0.5, y: ry + 0.5, type: type, health: 50, maxHealth: 50, speed: 1.6, size: 0.45 });
+                // Выбор типа врага (учитывая летающих на средней/высокой сложности)
+                let type;
+                if (settings.flyingEnemies) {
+                    const r = Math.random();
+                    type = r < 0.34 ? 'creeper' : (r < 0.67 ? 'skeleton' : 'flyer');
                 } else {
-                    enemies.push({ x: rx + 0.5, y: ry + 0.5, type: type, health: 30, maxHealth: 30, speed: 1.2, size: 0.45 });
+                    type = Math.random() > 0.5 ? 'creeper' : 'skeleton';
+                }
+
+                if (type === 'creeper') {
+                    enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: settings.creeperHp, maxHealth: settings.creeperHp, speed: 1.6, size: 0.45 });
+                } else if (type === 'skeleton') {
+                    enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: settings.skeletonHp, maxHealth: settings.skeletonHp, speed: 1.2, size: 0.45 });
+                } else {
+                    // Летающий враг: парит над полом, быстрее сближается
+                    enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0.9, type: type, health: settings.flyerHp, maxHealth: settings.flyerHp, speed: 2.0, size: 0.4, isFlying: true, hoverPhase: Math.random() * Math.PI * 2 });
                 }
             }
             spawned = true;
@@ -926,13 +954,21 @@ function spawnPickup(x, y) {
     });
 }
 
-function startGame() {
+function startGame(chosenDifficulty) {
+    if (chosenDifficulty) difficulty = chosenDifficulty;
     initAudio();
     document.getElementById("start-overlay").style.display = 'none';
     gameState = 'PLAYING';
     startBackgroundMusic();
+    updateDifficultyUi();
     canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;
     canvas.requestPointerLock();
+}
+
+function updateDifficultyUi() {
+    const label = DIFFICULTY_SETTINGS[difficulty].label;
+    const el = document.getElementById("difficulty-val");
+    if (el) el.innerText = label;
 }
 
 function restartGame() {
@@ -991,6 +1027,7 @@ function restartGame() {
 
     gameState = 'PLAYING';
     initAudio();
+    updateDifficultyUi();
     canvas.requestPointerLock();
 }
 
@@ -1380,7 +1417,7 @@ function update(dt) {
     });
 
     regularSpawnTimer += dt;
-    if (regularSpawnTimer >= 22) {
+    if (regularSpawnTimer >= DIFFICULTY_SETTINGS[difficulty].spawnInterval) {
         spawnEnemy(false); 
         spawnEnemy(false);
         regularSpawnTimer = 0;
@@ -1404,6 +1441,11 @@ function update(dt) {
             }
             scoreUi.innerText = score;
             return false;
+        }
+
+        if (enemy.isFlying) {
+            enemy.hoverPhase += dt * 2.2;
+            enemy.z = 0.9 + Math.sin(enemy.hoverPhase) * 0.15;
         }
 
         let dx = playerX - enemy.x;
@@ -1501,6 +1543,9 @@ function renderMinimap() {
             ctx.fillRect(mmX - 4, mmY - 4, 8, 8);
         } else if (enemy.type === 'creeper') {
             ctx.fillStyle = "#00ff00";
+            ctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5);
+        } else if (enemy.type === 'flyer') {
+            ctx.fillStyle = "#9fe0c0";
             ctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5);
         } else {
             ctx.fillStyle = "#ffff00";
@@ -1631,7 +1676,7 @@ function render() {
         let startY = (canvas.height / 2) - (wallHeight / 2);
         
         startY += playerPitch * 190;
-        startY -= (playerZ * 150) / correctedDistance;
+        startY += (playerZ * 150) / correctedDistance;
 
         let segments = 8;
         let shadow = Math.max(0.04, 1 - (correctedDistance / renderDistance));
@@ -1665,9 +1710,10 @@ function render() {
 
     enemies.forEach(e => {
         sprites.push({
-            x: e.x, y: e.y, z: 0.0,
+            x: e.x, y: e.y, z: e.z || 0.0,
             type: 'enemy',
             enemyType: e.type,
+            isFlying: !!e.isFlying,
             size: e.size,
             health: e.health,
             maxHealth: e.maxHealth,
@@ -1722,7 +1768,7 @@ function render() {
             let screenY = (canvas.height / 2) + (spriteScreenHeight / 2);
             
             screenY += playerPitch * 190;
-            screenY -= (playerZ * 150) / sprite.dist;
+            screenY += (playerZ * 150) / sprite.dist;
             screenY -= (sprite.z * 150) / sprite.dist;
 
             const spriteWidth = spriteScreenHeight * sprite.size * 2;
@@ -1740,65 +1786,138 @@ function render() {
                 } else {
                     if (sprite.type === 'enemy') {
                         if (sprite.enemyType === 'boss') {
-                            // РЕНДЕРИНГ БОССА: ГИГАНТСКИЙ КИБЕР-ДЕМОН
-                            // Главная пластина тела
-                            ctx.fillStyle = "#5c0519"; 
-                            ctx.fillRect(-spriteWidth / 2, -spriteScreenHeight, spriteWidth, spriteScreenHeight);
-                            ctx.fillStyle = "#990b2c"; 
-                            ctx.fillRect(-spriteWidth / 2.5, -spriteScreenHeight + 15, spriteWidth / 1.25, spriteScreenHeight - 30);
-                            
-                            // Мышцы пресса
-                            ctx.strokeStyle = "#38000a";
-                            ctx.lineWidth = 3;
-                            ctx.beginPath();
-                            ctx.moveTo(-spriteWidth / 3, -spriteScreenHeight / 2.2);
-                            ctx.lineTo(spriteWidth / 3, -spriteScreenHeight / 2.2);
-                            ctx.moveTo(-spriteWidth / 3, -spriteScreenHeight / 1.7);
-                            ctx.lineTo(spriteWidth / 3, -spriteScreenHeight / 1.7);
-                            ctx.moveTo(-spriteWidth / 3, -spriteScreenHeight / 1.3);
-                            ctx.lineTo(spriteWidth / 3, -spriteScreenHeight / 1.3);
-                            ctx.stroke();
+                            if (sprite.isFlying) {
+                                // РЕНДЕРИНГ ЛЕТАЮЩЕГО БОССА: ЧЕРНЫЙ КРЫЛАТЫЙ ДРАКОН
+                                const flap = Math.sin(performance.now() / 160) * 18;
 
-                            // Светящийся синий реактор в центре груди
-                            ctx.fillStyle = "#00f0ff";
-                            ctx.beginPath();
-                            ctx.arc(0, -spriteScreenHeight / 1.8, spriteWidth / 5, 0, Math.PI * 2);
-                            ctx.fill();
-                            ctx.fillStyle = "#ffffff";
-                            ctx.beginPath();
-                            ctx.arc(0, -spriteScreenHeight / 1.8, spriteWidth / 8, 0, Math.PI * 2);
-                            ctx.fill();
+                                // Крылья (перепончатые, с ребрами)
+                                ctx.fillStyle = "#160018";
+                                ctx.beginPath();
+                                ctx.moveTo(-spriteWidth / 2.4, -spriteScreenHeight / 1.5);
+                                ctx.lineTo(-spriteWidth / 0.95, -spriteScreenHeight / 1.4 - 50 - flap);
+                                ctx.lineTo(-spriteWidth / 1.3, -spriteScreenHeight / 3.2 - flap * 0.3);
+                                ctx.lineTo(-spriteWidth / 2.6, -spriteScreenHeight / 2.6);
+                                ctx.closePath();
+                                ctx.fill();
+                                ctx.beginPath();
+                                ctx.moveTo(spriteWidth / 2.4, -spriteScreenHeight / 1.5);
+                                ctx.lineTo(spriteWidth / 0.95, -spriteScreenHeight / 1.4 + 50 + flap);
+                                ctx.lineTo(spriteWidth / 1.3, -spriteScreenHeight / 3.2 + flap * 0.3);
+                                ctx.lineTo(spriteWidth / 2.6, -spriteScreenHeight / 2.6);
+                                ctx.closePath();
+                                ctx.fill();
+                                ctx.strokeStyle = "#3a0d40";
+                                ctx.lineWidth = 2.5;
+                                ctx.beginPath();
+                                ctx.moveTo(-spriteWidth / 2.4, -spriteScreenHeight / 1.5);
+                                ctx.lineTo(-spriteWidth / 0.95, -spriteScreenHeight / 1.4 - 50 - flap);
+                                ctx.moveTo(spriteWidth / 2.4, -spriteScreenHeight / 1.5);
+                                ctx.lineTo(spriteWidth / 0.95, -spriteScreenHeight / 1.4 + 50 + flap);
+                                ctx.stroke();
 
-                            // Огромные золотые рога по бокам
-                            ctx.fillStyle = "#ffd700";
-                            // Левый рог
-                            ctx.beginPath();
-                            ctx.moveTo(-spriteWidth / 2, -spriteScreenHeight + 12);
-                            ctx.lineTo(-spriteWidth / 1.2, -spriteScreenHeight - 25);
-                            ctx.lineTo(-spriteWidth / 3.2, -spriteScreenHeight + 5);
-                            ctx.closePath();
-                            ctx.fill();
-                            // Правый рог
-                            ctx.beginPath();
-                            ctx.moveTo(spriteWidth / 2, -spriteScreenHeight + 12);
-                            ctx.lineTo(spriteWidth / 1.2, -spriteScreenHeight - 25);
-                            ctx.lineTo(spriteWidth / 3.2, -spriteScreenHeight + 5);
-                            ctx.closePath();
-                            ctx.fill();
+                                // Длинная шея и тело — чёрная чешуя с фиолетовым отливом
+                                ctx.fillStyle = "#0e0210";
+                                ctx.fillRect(-spriteWidth / 3.2, -spriteScreenHeight, spriteWidth / 1.6, spriteScreenHeight);
+                                ctx.fillStyle = "#2b0a35";
+                                for (let seg = 0; seg < 5; seg++) {
+                                    ctx.beginPath();
+                                    ctx.moveTo(-spriteWidth / 3.2 + (seg * spriteWidth / 8), -spriteScreenHeight + seg * (spriteScreenHeight / 5.5));
+                                    ctx.lineTo(0, -spriteScreenHeight - 10 + seg * (spriteScreenHeight / 5.5));
+                                    ctx.lineTo(spriteWidth / 3.2 - (seg * spriteWidth / 8) - spriteWidth / 6, -spriteScreenHeight + seg * (spriteScreenHeight / 5.5));
+                                    ctx.closePath();
+                                    ctx.fill();
+                                }
 
-                            // Оружейный протез-ракетница вместо правой руки
-                            ctx.fillStyle = "#222222";
-                            ctx.fillRect(spriteWidth / 3, -spriteScreenHeight / 2.1, spriteWidth / 2.8, spriteScreenHeight / 2.2);
-                            ctx.fillStyle = "#ff5500";
-                            ctx.fillRect(spriteWidth / 2.5, -spriteScreenHeight / 2.15, spriteWidth / 4, 10);
+                                // Голова вытянутая с рогами
+                                ctx.fillStyle = "#150018";
+                                ctx.fillRect(-spriteWidth / 5, -spriteScreenHeight - 14, spriteWidth / 2.5, spriteScreenHeight / 4);
+                                ctx.fillStyle = "#c9a8ff";
+                                ctx.beginPath();
+                                ctx.moveTo(-spriteWidth / 5, -spriteScreenHeight - 14);
+                                ctx.lineTo(-spriteWidth / 3.6, -spriteScreenHeight - 34);
+                                ctx.lineTo(-spriteWidth / 9, -spriteScreenHeight - 10);
+                                ctx.closePath();
+                                ctx.fill();
+                                ctx.beginPath();
+                                ctx.moveTo(spriteWidth / 5 + spriteWidth / 2.5, -spriteScreenHeight - 14);
+                                ctx.lineTo(spriteWidth / 3.6 + spriteWidth / 2.5, -spriteScreenHeight - 34);
+                                ctx.lineTo(spriteWidth / 9 + spriteWidth / 2.5, -spriteScreenHeight - 10);
+                                ctx.closePath();
+                                ctx.fill();
 
-                            // Демонические желто-красные глаза
-                            ctx.fillStyle = "#ff0000";
-                            ctx.fillRect(-spriteWidth / 4, -spriteScreenHeight + 40, 18, 12);
-                            ctx.fillRect(spriteWidth / 8, -spriteScreenHeight + 40, 18, 12);
-                            ctx.fillStyle = "#ffff00";
-                            ctx.fillRect(-spriteWidth / 4.5, -spriteScreenHeight + 42, 8, 8);
-                            ctx.fillRect(spriteWidth / 7, -spriteScreenHeight + 42, 8, 8);
+                                // Светящиеся фиолетовые глаза
+                                ctx.fillStyle = "#b400ff";
+                                ctx.fillRect(-spriteWidth / 10, -spriteScreenHeight - 4, 10, 8);
+                                ctx.fillRect(spriteWidth / 20, -spriteScreenHeight - 4, 10, 8);
+
+                                // Шипы вдоль хребта
+                                ctx.fillStyle = "#c9a8ff";
+                                for (let sp = 0; sp < 4; sp++) {
+                                    const sy = -spriteScreenHeight / 1.4 + sp * (spriteScreenHeight / 5);
+                                    ctx.beginPath();
+                                    ctx.moveTo(-6, sy);
+                                    ctx.lineTo(0, sy - 16);
+                                    ctx.lineTo(6, sy);
+                                    ctx.closePath();
+                                    ctx.fill();
+                                }
+
+                            } else {
+                                // РЕНДЕРИНГ НАЗЕМНОГО БОССА: СЛЕПОЙ ПОДЗЕМНЫЙ СТРАЖ
+                                // Тёмно-синевато-чёрное коренастое тело
+                                ctx.fillStyle = "#12131c";
+                                ctx.fillRect(-spriteWidth / 2, -spriteScreenHeight, spriteWidth, spriteScreenHeight);
+                                ctx.fillStyle = "#1c1e2e";
+                                ctx.fillRect(-spriteWidth / 2.5, -spriteScreenHeight + 15, spriteWidth / 1.25, spriteScreenHeight - 30);
+
+                                // Светящиеся бирюзовые трещины-вены по телу
+                                ctx.strokeStyle = "#28e0d8";
+                                ctx.lineWidth = 3;
+                                ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 260) * 0.25;
+                                ctx.beginPath();
+                                ctx.moveTo(-spriteWidth / 3, -spriteScreenHeight / 2.4);
+                                ctx.lineTo(-spriteWidth / 6, -spriteScreenHeight / 1.8);
+                                ctx.lineTo(-spriteWidth / 4, -spriteScreenHeight / 1.3);
+                                ctx.moveTo(spriteWidth / 3, -spriteScreenHeight / 2.4);
+                                ctx.lineTo(spriteWidth / 6, -spriteScreenHeight / 1.8);
+                                ctx.lineTo(spriteWidth / 4, -spriteScreenHeight / 1.3);
+                                ctx.moveTo(0, -spriteScreenHeight / 1.9);
+                                ctx.lineTo(0, -spriteScreenHeight / 1.2);
+                                ctx.stroke();
+                                ctx.globalAlpha = 1.0;
+
+                                // Светящееся бирюзовое ядро в груди (вместо сердца)
+                                ctx.fillStyle = "#00fff2";
+                                ctx.beginPath();
+                                ctx.arc(0, -spriteScreenHeight / 1.8, spriteWidth / 6, 0, Math.PI * 2);
+                                ctx.fill();
+
+                                // Похожие на уши/щупальца наросты на голове (без глаз)
+                                ctx.fillStyle = "#2a2c40";
+                                for (let t = -2; t <= 2; t++) {
+                                    if (t === 0) continue;
+                                    const tw = Math.sin(performance.now() / 300 + t) * 6;
+                                    ctx.beginPath();
+                                    ctx.moveTo(t * spriteWidth / 9, -spriteScreenHeight + 10);
+                                    ctx.lineTo(t * spriteWidth / 9 + tw, -spriteScreenHeight - 24 - Math.abs(t) * 4);
+                                    ctx.lineTo(t * spriteWidth / 9 + spriteWidth / 20, -spriteScreenHeight + 14);
+                                    ctx.closePath();
+                                    ctx.fill();
+                                }
+
+                                // Массивные когтистые руки
+                                ctx.fillStyle = "#0a0b12";
+                                ctx.fillRect(-spriteWidth / 1.9, -spriteScreenHeight / 2.1, spriteWidth / 6, spriteScreenHeight / 1.9);
+                                ctx.fillRect(spriteWidth / 1.9 - spriteWidth / 6, -spriteScreenHeight / 2.1, spriteWidth / 6, spriteScreenHeight / 1.9);
+                                ctx.fillStyle = "#28e0d8";
+                                ctx.fillRect(-spriteWidth / 1.9, -spriteScreenHeight / 5.5, spriteWidth / 6, 4);
+                                ctx.fillRect(spriteWidth / 1.9 - spriteWidth / 6, -spriteScreenHeight / 5.5, spriteWidth / 6, 4);
+
+                                // Ноздри-щели вместо глаз
+                                ctx.fillStyle = "#000000";
+                                ctx.fillRect(-spriteWidth / 8, -spriteScreenHeight + 42, spriteWidth / 16, 10);
+                                ctx.fillRect(spriteWidth / 24, -spriteScreenHeight + 42, spriteWidth / 16, 10);
+                            }
 
                         } else if (sprite.enemyType === 'creeper') {
                             // РЕНДЕРИНГ КРИПЕРА: ЗЕЛЕНЫЙ ПРОРИСОВАННЫЙ МОНСТР
@@ -1829,6 +1948,61 @@ function render() {
                             ctx.fillStyle = "#000000";
                             ctx.fillRect(-spriteWidth / 2.5, -5, spriteWidth / 5, 5);
                             ctx.fillRect(spriteWidth / 5, -5, spriteWidth / 5, 5);
+
+                        } else if (sprite.enemyType === 'flyer') {
+                            // РЕНДЕРИНГ ЛЕТАЮЩЕГО ВРАГА: ПРИЗРАЧНЫЙ ЛЕТУН
+                            const wingFlap = Math.sin(performance.now() / 110 + sprite.x * 3) * (spriteWidth * 0.28);
+
+                            // Тень на полу
+                            ctx.fillStyle = "rgba(0,0,0,0.3)";
+                            ctx.beginPath();
+                            ctx.ellipse(0, 6, spriteWidth / 2.6, spriteWidth / 11, 0, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            // Перепончатые крылья
+                            ctx.fillStyle = "#4a5850";
+                            ctx.beginPath();
+                            ctx.moveTo(-spriteWidth / 8, -spriteScreenHeight / 1.7);
+                            ctx.lineTo(-spriteWidth / 1.3, -spriteScreenHeight / 1.7 - wingFlap);
+                            ctx.lineTo(-spriteWidth / 2.2, -spriteScreenHeight / 2.6);
+                            ctx.lineTo(-spriteWidth / 6, -spriteScreenHeight / 2.3);
+                            ctx.closePath();
+                            ctx.fill();
+                            ctx.beginPath();
+                            ctx.moveTo(spriteWidth / 8, -spriteScreenHeight / 1.7);
+                            ctx.lineTo(spriteWidth / 1.3, -spriteScreenHeight / 1.7 + wingFlap);
+                            ctx.lineTo(spriteWidth / 2.2, -spriteScreenHeight / 2.6);
+                            ctx.lineTo(spriteWidth / 6, -spriteScreenHeight / 2.3);
+                            ctx.closePath();
+                            ctx.fill();
+                            ctx.strokeStyle = "#7fa090";
+                            ctx.lineWidth = 1.5;
+                            ctx.globalAlpha = 0.6;
+                            ctx.beginPath();
+                            ctx.moveTo(-spriteWidth / 8, -spriteScreenHeight / 1.7);
+                            ctx.lineTo(-spriteWidth / 1.3, -spriteScreenHeight / 1.7 - wingFlap);
+                            ctx.moveTo(spriteWidth / 8, -spriteScreenHeight / 1.7);
+                            ctx.lineTo(spriteWidth / 1.3, -spriteScreenHeight / 1.7 + wingFlap);
+                            ctx.stroke();
+                            ctx.globalAlpha = 1.0;
+
+                            // Вытянутое серо-зелёное тело
+                            ctx.fillStyle = "#5c6e62";
+                            ctx.beginPath();
+                            ctx.ellipse(0, -spriteScreenHeight / 2.0, spriteWidth / 6, spriteScreenHeight / 3.2, 0, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            // Хвост из сегментов
+                            ctx.fillStyle = "#4a5850";
+                            for (let seg = 0; seg < 3; seg++) {
+                                const segY = -spriteScreenHeight / 2.6 + seg * (spriteScreenHeight / 8);
+                                ctx.fillRect(-spriteWidth / 16 + seg * (spriteWidth/40), segY, spriteWidth / 9 - seg * (spriteWidth/40), 8);
+                            }
+
+                            // Бледные светящиеся глаза
+                            ctx.fillStyle = "#e8f5ee";
+                            ctx.fillRect(-spriteWidth / 11, -spriteScreenHeight / 1.55, 7, 5);
+                            ctx.fillRect(spriteWidth / 30, -spriteScreenHeight / 1.55, 7, 5);
 
                         } else {
                             // РЕНДЕРИНГ СКЕЛЕТА: ВОЙН-ГВАРДЕЕЦ С РЕБРАМИ
