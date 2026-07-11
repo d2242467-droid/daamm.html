@@ -39,15 +39,15 @@ const mapSize = 32;
 const map = [
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
     1,0,0,0,0,0,2,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,2,0,0,2,0,2,2,2,2,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,0,0,0,0,0,0,0,0,2,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,0,2,2,2,2,2,0,0,2,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,2,0,0,0,2,0,0,0,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,2,0,0,2,0,2,2,2,2,0,2,0,1,0,6,6,6,6,6,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,0,0,0,0,0,0,0,0,2,0,2,0,1,0,6,0,0,0,6,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,0,2,2,2,2,2,0,0,2,0,2,0,1,0,6,0,0,0,6,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,2,0,0,0,2,0,0,0,0,2,0,1,0,6,6,6,6,6,0,0,0,0,0,0,0,0,0,1,
     1,0,2,0,2,0,0,0,2,0,2,2,2,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,2,0,2,2,0,2,2,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,0,0,0,0,0,0,0,2,2,2,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,2,2,2,2,2,2,0,2,0,2,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,2,0,2,0,2,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,0,0,0,0,0,0,0,2,2,2,0,0,1,0,6,6,6,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,2,2,2,2,2,2,0,2,0,2,2,0,1,0,6,0,6,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,2,0,2,0,2,2,0,1,0,6,6,6,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,2,2,2,0,2,0,2,0,2,0,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,2,0,0,0,2,0,0,0,2,2,0,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,2,0,2,2,2,2,2,2,2,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
@@ -75,8 +75,15 @@ const map = [
 let playerX = 3.5;
 let playerY = 3.5;
 let playerAngle = 0.0;
+let playerPitch = 0.0; // Вертикальный наклон (вверх/вниз, радианы)
 let health = 100;
 let score = 0;
+// Вертикальная позиция для прыжка
+let playerZ = 0;
+let playerVelZ = 0;
+let isOnGround = true;
+const GRAVITY = 20.0;
+const JUMP_VELOCITY = 8.0;
 
 const FOV = Math.PI / 3;
 const HALF_FOV = FOV / 2;
@@ -122,6 +129,7 @@ function spawnEnemy(isBoss = false) {
         let rx = Math.floor(Math.random() * mapSize);
         let ry = Math.floor(Math.random() * mapSize);
         
+        // Враги спавнятся на пустых клетках (0), не на платформах (6)
         if (map[ry * mapSize + rx] === 0 && Math.hypot(rx - playerX, ry - playerY) > 5) {
             if (isBoss) {
                 enemies.push({
@@ -154,6 +162,16 @@ window.addEventListener('keydown', e => {
     if (e.code === 'Digit1') { currentWeapon = 'shotgun'; weaponUi.innerText = "SHOTGUN [1]"; reloadUi.innerText = ""; }
     if (e.code === 'Digit2') { currentWeapon = 'rifle'; weaponUi.innerText = `RIFLE [2] (${rifleClip}/30)`; }
     if (e.code === 'Digit3') { currentWeapon = 'rocket'; weaponUi.innerText = `ROCKET [3] ${rocketLoaded ? '(READY)' : '(RELOADING)'}`; }
+    // Прыжок по пробелу (одиночный толчок)
+    if (e.code === 'Space') {
+        if (isOnGround) {
+            playerVelZ = JUMP_VELOCITY;
+            isOnGround = false;
+        }
+        // Не держим Space в keys чтобы он не использовался для стрельбы
+        keys[e.code] = false;
+        e.preventDefault && e.preventDefault();
+    }
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
@@ -183,8 +201,10 @@ canvas.addEventListener('mousemove', (e) => {
         // Горизонтальный поворот (по оси Y для FPS)
         playerAngle += deltaX * 0.003;
         
-        // Вертикальный наклон (если понадобится позже)
-        // playerVerticalAngle += deltaY * 0.003;
+        // Вертикальный наклон (pitch) - вверх/вниз
+        playerPitch += deltaY * 0.003;
+        // Ограничиваем угол по вертикали (±60 градусов)
+        playerPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, playerPitch));
     }
 });
 
@@ -234,7 +254,10 @@ function startRifleReload() {
 }
 
 function checkHit(fovSpread, damage) {
-    // Улучшенный checkHit: проверка попадания учитывает line-of-sight (DDA по прямой к врагу)
+    // Стрельба всегда в центр экрана (где находится прицел)
+    const rayAngle = playerAngle;
+    const rayPitch = playerPitch;
+    
     let hitTarget = null;
     let minEnemyDist = Infinity;
 
@@ -254,7 +277,6 @@ function checkHit(fovSpread, damage) {
             const cellY = Math.floor(cy);
             if (cellX < 0 || cellX >= mapSize || cellY < 0 || cellY >= mapSize) return false;
             if (map[cellY * mapSize + cellX] > 0) {
-                // Если стена находится значительно ближе, чем сам враг — свободного LOS нет
                 const wallDist = Math.hypot(cx - playerX, cy - playerY);
                 if (wallDist + 0.15 < dist) return false;
             }
@@ -262,12 +284,13 @@ function checkHit(fovSpread, damage) {
         return true;
     }
 
+    // Проверяем попадание в окружности вокруг центра прицела
     enemies.forEach(enemy => {
-        let enemyAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX) - playerAngle;
-        while (enemyAngle < -Math.PI) enemyAngle += Math.PI * 2;
-        while (enemyAngle > Math.PI) enemyAngle -= Math.PI * 2;
-
-        if (Math.abs(enemyAngle) < fovSpread) {
+        const enemyAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX);
+        const angleDiff = Math.abs(enemyAngle - rayAngle);
+        
+        // Используем fovSpread как радиус для попадания
+        if (angleDiff < fovSpread || angleDiff > Math.PI - fovSpread) {
             let dist = Math.hypot(enemy.x - playerX, enemy.y - playerY);
             if (dist < minEnemyDist && hasLineOfSight(enemy)) {
                 minEnemyDist = dist;
@@ -289,9 +312,27 @@ function checkHit(fovSpread, damage) {
 function update(dt) {
     if (health <= 0) return;
 
-    // Считывание непрерывной стрельбы (для зажатого пробела или мыши)
-    if (isMouseDown || keys['Space']) {
+    // Считывание непрерывной стрельбы (только мышь или зажатая ЛКМ)
+    if (isMouseDown) {
         executeShot();
+    }
+
+    // Обновление вертикальной физики (прыжок)
+    if (!isOnGround) {
+        playerVelZ -= GRAVITY * dt;
+        playerZ += playerVelZ * dt;
+        
+        // Приземление на платформы второго этажа (высота ~1.0)
+        const cellX = Math.floor(playerX);
+        const cellY = Math.floor(playerY);
+        const cellValue = map[cellY * mapSize + cellX];
+        const platformHeight = (cellValue === 6) ? 1.0 : 0;
+        
+        if (playerZ <= platformHeight) {
+            playerZ = platformHeight;
+            playerVelZ = 0;
+            isOnGround = true;
+        }
     }
 
     const moveSpeed = 4.0 * dt;
@@ -312,8 +353,21 @@ function update(dt) {
     if (keys['KeyA']) { newX += Math.cos(playerAngle - Math.PI / 2) * moveSpeed; newY += Math.sin(playerAngle - Math.PI / 2) * moveSpeed; isMoving = true; }
     if (keys['KeyD']) { newX += Math.cos(playerAngle + Math.PI / 2) * moveSpeed; newY += Math.sin(playerAngle + Math.PI / 2) * moveSpeed; isMoving = true; }
 
-    if (map[Math.floor(playerY) * mapSize + Math.floor(newX)] === 0) playerX = newX;
-    if (map[Math.floor(newY) * mapSize + Math.floor(playerX)] === 0) playerY = newY;
+    // Коллизия: можешь проходить сквозь платформы 6 если ты в воздухе выше них
+    let canPassPlatforms = playerZ > 1.5;  // Платформы на высоте ~1.0
+    let checkCellX = Math.floor(newX);
+    let checkCellY = Math.floor(playerY);
+    let cellValue = map[checkCellY * mapSize + checkCellX];
+    if (cellValue === 0 || (cellValue === 6 && canPassPlatforms)) {
+        playerX = newX;
+    }
+    
+    checkCellX = Math.floor(playerX);
+    checkCellY = Math.floor(newY);
+    cellValue = map[checkCellY * mapSize + checkCellX];
+    if (cellValue === 0 || (cellValue === 6 && canPassPlatforms)) {
+        playerY = newY;
+    }
 
     // Логика оружия
     if (rifleFireRateTimer > 0) rifleFireRateTimer -= dt;
@@ -382,8 +436,9 @@ function update(dt) {
         if (dist < 20 && dist > 0.3) {
             let moveX = enemy.x + (dx / dist) * enemy.speed * dt;
             let moveY = enemy.y + (dy / dist) * enemy.speed * dt;
-            if (map[Math.floor(enemy.y) * mapSize + Math.floor(moveX)] === 0) enemy.x = moveX;
-            if (map[Math.floor(moveY) * mapSize + Math.floor(enemy.x)] === 0) enemy.y = moveY;
+            // Враги не могут подняться на платформы второго этажа
+            if (map[Math.floor(enemy.y) * mapSize + Math.floor(moveX)] !== 1 && map[Math.floor(enemy.y) * mapSize + Math.floor(moveX)] !== 6) enemy.x = moveX;
+            if (map[Math.floor(moveY) * mapSize + Math.floor(enemy.x)] !== 1 && map[Math.floor(moveY) * mapSize + Math.floor(enemy.x)] !== 6) enemy.y = moveY;
         }
 
         if (dist <= 0.6) {
@@ -409,6 +464,7 @@ function getWallColors(wallType, yPixel, wallHeight) {
         case 3: return isEvenRow ? ["#666666", "#555555"] : ["#1eb31a", "#116610"];
         case 4: return isEvenRow ? ["#1eb31a", "#116610"] : ["#1a5cb3", "#103870"];
         case 5: return isEvenRow ? ["#1a5cb3", "#103870"] : ["#b31a1a", "#801010"];
+        case 6: return isEvenRow ? ["#1a90ff", "#0f6fdd"] : ["#00bfff", "#0099cc"];
         default: return isEvenRow ? ["#333333", "#222222"] : ["#777777", "#555555"];
     }
 }
@@ -429,8 +485,13 @@ function renderMinimap() {
     // Стены на мини-карте
     for (let y = 0; y < mapSize; y++) {
         for (let x = 0; x < mapSize; x++) {
-            if (map[y * mapSize + x] > 0) {
-                ctx.fillStyle = "#444444";
+            const cellValue = map[y * mapSize + x];
+            if (cellValue > 0) {
+                if (cellValue === 6) {
+                    ctx.fillStyle = "#7cb9e8"; // Платформы второго этажа - голубые
+                } else {
+                    ctx.fillStyle = "#444444"; // Обычные стены - серые
+                }
                 ctx.fillRect(minimapX + x * cellSize, minimapY + y * cellSize, cellSize, cellSize);
             }
         }
@@ -493,7 +554,11 @@ function render() {
                 hitWall = true; distance = renderDistance; wallType = 1;
             } else {
                 let cell = map[checkY * mapSize + checkX];
-                if (cell > 0) { hitWall = true; wallType = cell; }
+                if (cell > 0) { 
+                    // Платформы (6) всегда видны как стены
+                    hitWall = true; 
+                    wallType = cell; 
+                }
             }
         }
 
@@ -502,6 +567,8 @@ function render() {
 
         let wallHeight = Math.min(canvas.height, (canvas.height / correctedDistance));
         let startY = (canvas.height / 2) - (wallHeight / 2);
+        // Смещение в зависимости от вертикального наклона камеры
+        startY += playerPitch * 200;
         let segments = 8;
         let shadow = Math.max(0.05, 1 - (correctedDistance / renderDistance));
 
@@ -535,7 +602,9 @@ function render() {
 
             const spriteScreenHeight = Math.min(canvas.height, (canvas.height / enemy.dist));
             const screenX = Math.tan(ang) * (canvas.width / 2) + (canvas.width / 2);
-            const screenY = (canvas.height / 2) + (spriteScreenHeight / 2);
+            let screenY = (canvas.height / 2) + (spriteScreenHeight / 2);
+            // Учитываем вертикальный наклон камеры при отрисовке врагов
+            screenY += playerPitch * 200;
             const spriteWidth = spriteScreenHeight * enemy.size * 2;
 
             ctx.save();
@@ -597,18 +666,32 @@ function render() {
         let gunX = canvas.width / 2;
         let gunY = canvas.height;
 
+        // Смещение из прыжка
+        gunY -= playerZ * 40;
+
         if (isMoving && !isShooting) {
             gunX += Math.sin(walkCycle) * 12;
             gunY += Math.abs(Math.cos(walkCycle)) * 8 - 4;
         }
 
         if (isShooting) {
-            gunY += (currentWeapon === 'shotgun') ? (shootTimer < 1.5 ? 30 : -15) : (Math.sin(shootTimer * 4) * 5);
-            
+            // разная отдача для оружий
+            if (currentWeapon === 'shotgun') gunY += (shootTimer < 1.5 ? 30 : -15);
+            else if (currentWeapon === 'rifle') gunY += Math.sin(shootTimer * 4) * 6;
+            else gunY += Math.sin(shootTimer * 3) * 8;
+
             // Вспышка (Muzzle Flash)
             if (shootTimer < 2) {
-                ctx.fillStyle = currentWeapon === 'shotgun' ? "rgba(255, 180, 0, 0.9)" : "rgba(0, 255, 200, 0.9)";
-                ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2 + (currentWeapon === 'shotgun' ? 50 : 20), currentWeapon === 'shotgun' ? 50 : 25, 0, Math.PI * 2); ctx.fill();
+                if (currentWeapon === 'shotgun') {
+                    ctx.fillStyle = "rgba(255, 180, 0, 0.9)";
+                    ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2 + 50, 50, 0, Math.PI * 2); ctx.fill();
+                } else if (currentWeapon === 'rifle') {
+                    ctx.fillStyle = "rgba(255, 220, 120, 0.9)";
+                    ctx.fillRect(canvas.width / 2 - 30, canvas.height / 2 + 20, 60, 40);
+                } else {
+                    ctx.fillStyle = "rgba(255,100,20,0.9)";
+                    ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2 + 30, 30, 0, Math.PI * 2); ctx.fill();
+                }
             }
         }
 
@@ -616,24 +699,90 @@ function render() {
             gunY += 80; // Спрятать оружие вниз во время перезарядки
         }
 
+        // Отрисовка моделей оружия
         if (currentWeapon === 'shotgun') {
-            // Отрисовка дробовика
+            // Дробовик (двойные стволы)
             ctx.fillStyle = "#3a3a3a"; ctx.fillRect(gunX - 30, gunY - 160, 25, 170); ctx.fillRect(gunX + 5, gunY - 160, 25, 170);
             ctx.fillStyle = "#000"; ctx.fillRect(gunX - 25, gunY - 160, 15, 12); ctx.fillRect(gunX + 10, gunY - 160, 15, 12);
             ctx.fillStyle = "#5c4033"; ctx.fillRect(gunX - 35, gunY - 70, 70, 80);
+        } else if (currentWeapon === 'rifle') {
+            // Assault Rifle - золотистый корпус с чёрным стволом сверху
+            // Приклад (дерево)
+            ctx.fillStyle = "#8B7355"; ctx.fillRect(gunX - 150, gunY - 75, 60, 28);
+            // Основной корпус (золотистый)
+            ctx.fillStyle = "#D4AF37"; ctx.fillRect(gunX - 90, gunY - 110, 150, 28);
+            // Магазин (чёрный)
+            ctx.fillStyle = "#1a1a1a"; ctx.fillRect(gunX - 20, gunY - 88, 20, 45);
+            // Верхний ствол (чёрный, толстый)
+            ctx.fillStyle = "#0a0a0a"; ctx.fillRect(gunX + 40, gunY - 150, 60, 16);
+            // Рукоять управления огнём (под стволом)
+            ctx.fillStyle = "#1a1a1a"; ctx.fillRect(gunX - 50, gunY - 65, 15, 35);
+            // Передний хват (золотистый)
+            ctx.fillStyle = "#C0A030"; ctx.fillRect(gunX + 20, gunY - 85, 12, 30);
+            // Мушка и прицел (светлые)
+            ctx.fillStyle = "#e8e8e8"; ctx.fillRect(gunX + 50, gunY - 160, 4, 8); ctx.fillRect(gunX + 100, gunY - 162, 4, 10);
         } else {
-            // Отрисовка Штурмовой винтовки (Стиль хай-тек автомата)
-            ctx.fillStyle = "#222"; 
-            ctx.fillRect(gunX - 10, gunY - 210, 20, 220); // Длинный ствол винтовки по центру
-            ctx.fillStyle = "#00ffcc"; 
-            ctx.fillRect(gunX - 4, gunY - 190, 8, 80); // Светящийся лазерный прицел/плазмопровод
-            ctx.fillStyle = "#444"; 
-            ctx.fillRect(gunX - 20, gunY - 90, 40, 100); // Ствольная коробка
+            // RPG - зелёная боеголовка, чёрный механизм, рыжие реактивные трубки
+            // Плечевой упор (чёрный, слева)
+            ctx.fillStyle = "#1a1a1a"; ctx.fillRect(gunX - 100, gunY - 90, 70, 16);
+            // Основная трубка (чёрная)
+            ctx.fillStyle = "#1f1f1f"; ctx.fillRect(gunX - 40, gunY - 140, 160, 28);
+            // Боеголовка (ярко-зелёная)
+            ctx.fillStyle = "#2ecc71"; 
+            ctx.beginPath(); 
+            ctx.moveTo(gunX + 120, gunY - 126);
+            ctx.lineTo(gunX + 150, gunY - 126);
+            ctx.lineTo(gunX + 145, gunY - 110);
+            ctx.lineTo(gunX + 125, gunY - 110);
+            ctx.closePath();
+            ctx.fill();
+            // Наконечник боеголовки (конус)
+            ctx.fillStyle = "#27ae60"; ctx.beginPath(); ctx.moveTo(gunX + 150, gunY - 126); ctx.lineTo(gunX + 165, gunY - 118); ctx.lineTo(gunX + 150, gunY - 110); ctx.closePath(); ctx.fill();
+            // Реактивные трубки (рыжие, сзади)
+            ctx.fillStyle = "#d35400"; ctx.fillRect(gunX - 90, gunY - 55, 20, 28); ctx.fillRect(gunX - 50, gunY - 55, 20, 28);
+            // Стабилизаторы (чёрные перья)
+            ctx.fillStyle = "#0a0a0a"; ctx.fillRect(gunX - 30, gunY - 50, 15, 40); ctx.fillRect(gunX - 10, gunY - 50, 15, 40);
+            // Прицельная линия (красная)
+            ctx.strokeStyle = "#e74c3c"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(gunX + 30, gunY - 160); ctx.lineTo(gunX + 100, gunY - 160); ctx.stroke();
         }
     } else {
         ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "#ff3333"; ctx.font = "bold 45px monospace"; ctx.textAlign = "center"; ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
     }
+    
+    // Отрисовка прицела по центру экрана
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const crosshairSize = 20;
+    const crosshairColor = "#00ff00";
+    
+    // Вертикальная линия прицела
+    ctx.strokeStyle = crosshairColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - crosshairSize);
+    ctx.lineTo(centerX, centerY - 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY + crosshairSize);
+    ctx.lineTo(centerX, centerY + 10);
+    ctx.stroke();
+    
+    // Горизонтальная линия прицела
+    ctx.beginPath();
+    ctx.moveTo(centerX - crosshairSize, centerY);
+    ctx.lineTo(centerX - 10, centerY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(centerX + crosshairSize, centerY);
+    ctx.lineTo(centerX + 10, centerY);
+    ctx.stroke();
+    
+    // Центральная точка прицела
+    ctx.fillStyle = crosshairColor;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 3, 0, Math.PI * 2);
+    ctx.fill();
     
     // Отрисовка мини-карты
     renderMinimap();
