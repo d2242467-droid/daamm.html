@@ -9,7 +9,7 @@
         body { background-color: #111; color: white; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
         canvas { border: 4px solid #555; background: #000; box-shadow: 0 0 30px rgba(255, 0, 100, 0.4); cursor: crosshair; }
         #ui { margin-top: 10px; font-size: 18px; text-shadow: 2px 2px black; color: #ff3333; font-weight: bold; letter-spacing: 2px; text-align: center; width: 800px; display: flex; justify-content: space-between; }
-        #boss-ui { color: #ff00ff; font-size: 22px; text-align: center; width: 800px; margin-bottom: 5px; font-weight: bold; display: none; }
+        #boss-ui { color: #1100ff; font-size: 22px; text-align: center; width: 800px; margin-bottom: 5px; font-weight: bold; display: none; }
     </style>
 </head>
 <body>
@@ -85,8 +85,8 @@ const renderDistance = 32;
 const depthBuffer = new Array(numRays);
 
 // Оружие и инвентарь
-let currentWeapon = 'shotgun'; // 'shotgun' или 'rifle'
-let ammo = 100;
+let currentWeapon = 'shotgun'; // 'shotgun', 'rifle' или 'rocket'
+let ammo = 100; // общий пул патронов для дробовика/винтовки
 let rifleClip = 30; // Обойма винтовки
 let isShooting = false;
 let shootTimer = 0;
@@ -97,6 +97,16 @@ let isMoving = false;
 let rifleFireRateTimer = 0;
 let isReloading = false;
 let reloadTimer = 0;
+
+// Ракетное оружие (один снаряд, 3с перезарядка)
+let rocketLoaded = true;
+let rocketReloadTimer = 0;
+const rocketReloadDuration = 3.0;
+
+// Урон (в новых единицах по просьбе)
+const SHOTGUN_DAMAGE = 20;
+const RIFLE_DAMAGE = 10;
+const ROCKET_DAMAGE = 100;
 
 // Враги и таймеры спавна
 let enemies = [];
@@ -116,18 +126,18 @@ function spawnEnemy(isBoss = false) {
             if (isBoss) {
                 enemies.push({
                     x: rx + 0.5, y: ry + 0.5,
-                    type: 'boss', health: 30, speed: 2.0, size: 0.8
+                    type: 'boss', health: 1000, maxHealth: 1000, speed: 2.0, size: 1.2
                 });
                 hasBoss = true;
                 bossUi.style.display = "block";
-                bossHpUi.innerText = 30;
+                bossHpUi.innerText = 1000;
             } else {
                 let type = Math.random() > 0.5 ? 'creeper' : 'skeleton';
-                enemies.push({
-                    x: rx + 0.5, y: ry + 0.5, type: type,
-                    health: type === 'creeper' ? 2 : 3,
-                    speed: type === 'creeper' ? 1.5 : 1.1, size: 0.4
-                });
+                if (type === 'creeper') {
+                    enemies.push({ x: rx + 0.5, y: ry + 0.5, type: type, health: 50, maxHealth: 50, speed: 1.5, size: 0.4 });
+                } else {
+                    enemies.push({ x: rx + 0.5, y: ry + 0.5, type: type, health: 30, maxHealth: 30, speed: 1.1, size: 0.4 });
+                }
             }
             spawned = true;
         }
@@ -143,13 +153,40 @@ window.addEventListener('keydown', e => {
     keys[e.code] = true;
     if (e.code === 'Digit1') { currentWeapon = 'shotgun'; weaponUi.innerText = "SHOTGUN [1]"; reloadUi.innerText = ""; }
     if (e.code === 'Digit2') { currentWeapon = 'rifle'; weaponUi.innerText = `RIFLE [2] (${rifleClip}/30)`; }
+    if (e.code === 'Digit3') { currentWeapon = 'rocket'; weaponUi.innerText = `ROCKET [3] ${rocketLoaded ? '(READY)' : '(RELOADING)'}`; }
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
 // Клик / зажатие мыши
 let isMouseDown = false;
-canvas.addEventListener('mousedown', () => isMouseDown = true);
+let isMouseLocked = false;
+
+canvas.addEventListener('mousedown', () => {
+    isMouseDown = true;
+    // Запрос Pointer Lock
+    canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;
+    canvas.requestPointerLock();
+});
 window.addEventListener('mouseup', () => isMouseDown = false);
+
+// Pointer Lock изменение
+document.addEventListener('pointerlockchange', () => {
+    isMouseLocked = (document.pointerLockElement === canvas || document.mozPointerLockElement === canvas);
+});
+
+// Управление камерой мышкой
+canvas.addEventListener('mousemove', (e) => {
+    if (isMouseLocked) {
+        let deltaX = e.movementX || e.mozMovementX || 0;
+        let deltaY = e.movementY || e.mozMovementY || 0;
+        
+        // Горизонтальный поворот (по оси Y для FPS)
+        playerAngle += deltaX * 0.003;
+        
+        // Вертикальный наклон (если понадобится позже)
+        // playerVerticalAngle += deltaY * 0.003;
+    }
+});
 
 function executeShot() {
     if (health <= 0) return;
@@ -160,7 +197,7 @@ function executeShot() {
             shootTimer = 0;
             ammo--;
             ammoUi.innerText = ammo;
-            checkHit(0.18, 1);
+            checkHit(0.18, SHOTGUN_DAMAGE);
         }
     } else if (currentWeapon === 'rifle') {
         if (!isReloading && rifleClip > 0 && ammo > 0 && rifleFireRateTimer <= 0) {
@@ -171,11 +208,21 @@ function executeShot() {
             ammoUi.innerText = ammo;
             weaponUi.innerText = `RIFLE [2] (${rifleClip}/30)`;
             rifleFireRateTimer = 0.12; // Задержка между выстрелами винтовки (быстро)
-            checkHit(0.08, 1);
+            checkHit(0.08, RIFLE_DAMAGE);
 
             if (rifleClip <= 0 && ammo > 0) {
                 startRifleReload();
             }
+        }
+    } else if (currentWeapon === 'rocket') {
+        if (rocketLoaded) {
+            isShooting = true;
+            shootTimer = 0;
+            rocketLoaded = false;
+            rocketReloadTimer = rocketReloadDuration;
+            reloadUi.innerText = "(ROCKET RELOADING...)";
+            checkHit(0.06, ROCKET_DAMAGE);
+            if (currentWeapon === 'rocket') weaponUi.innerText = `ROCKET [3] (RELOADING)`;
         }
     }
 }
@@ -187,8 +234,33 @@ function startRifleReload() {
 }
 
 function checkHit(fovSpread, damage) {
+    // Улучшенный checkHit: проверка попадания учитывает line-of-sight (DDA по прямой к врагу)
     let hitTarget = null;
     let minEnemyDist = Infinity;
+
+    function hasLineOfSight(enemy) {
+        const dx = enemy.x - playerX;
+        const dy = enemy.y - playerY;
+        const dist = Math.hypot(dx, dy);
+        const steps = Math.max(8, Math.floor(dist / 0.05));
+        const stepX = dx / steps;
+        const stepY = dy / steps;
+        let cx = playerX;
+        let cy = playerY;
+        for (let i = 0; i < steps; i++) {
+            cx += stepX;
+            cy += stepY;
+            const cellX = Math.floor(cx);
+            const cellY = Math.floor(cy);
+            if (cellX < 0 || cellX >= mapSize || cellY < 0 || cellY >= mapSize) return false;
+            if (map[cellY * mapSize + cellX] > 0) {
+                // Если стена находится значительно ближе, чем сам враг — свободного LOS нет
+                const wallDist = Math.hypot(cx - playerX, cy - playerY);
+                if (wallDist + 0.15 < dist) return false;
+            }
+        }
+        return true;
+    }
 
     enemies.forEach(enemy => {
         let enemyAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX) - playerAngle;
@@ -197,10 +269,7 @@ function checkHit(fovSpread, damage) {
 
         if (Math.abs(enemyAngle) < fovSpread) {
             let dist = Math.hypot(enemy.x - playerX, enemy.y - playerY);
-            let checkX = Math.floor(playerX + Math.cos(playerAngle) * dist);
-            let checkY = Math.floor(playerY + Math.sin(playerAngle) * dist);
-            
-            if (dist < minEnemyDist && map[checkY * mapSize + checkX] === 0) {
+            if (dist < minEnemyDist && hasLineOfSight(enemy)) {
                 minEnemyDist = dist;
                 hitTarget = enemy;
             }
@@ -228,15 +297,20 @@ function update(dt) {
     const moveSpeed = 4.0 * dt;
     const rotSpeed = 2.4 * dt;
 
-    if (keys['KeyA'] || keys['ArrowLeft'])  playerAngle -= rotSpeed;
-    if (keys['KeyD'] || keys['ArrowRight']) playerAngle += rotSpeed;
+    if (keys['ArrowLeft'])  playerAngle -= rotSpeed;
+    if (keys['ArrowRight']) playerAngle += rotSpeed;
 
     let newX = playerX;
     let newY = playerY;
     isMoving = false;
 
+    // Движение вперёд/назад
     if (keys['KeyW'] || keys['ArrowUp']) { newX += Math.cos(playerAngle) * moveSpeed; newY += Math.sin(playerAngle) * moveSpeed; isMoving = true; }
     if (keys['KeyS'] || keys['ArrowDown']) { newX -= Math.cos(playerAngle) * moveSpeed; newY -= Math.sin(playerAngle) * moveSpeed; isMoving = true; }
+    
+    // Боковое движение (strafe) - влево и вправо без поворота камеры
+    if (keys['KeyA']) { newX += Math.cos(playerAngle - Math.PI / 2) * moveSpeed; newY += Math.sin(playerAngle - Math.PI / 2) * moveSpeed; isMoving = true; }
+    if (keys['KeyD']) { newX += Math.cos(playerAngle + Math.PI / 2) * moveSpeed; newY += Math.sin(playerAngle + Math.PI / 2) * moveSpeed; isMoving = true; }
 
     if (map[Math.floor(playerY) * mapSize + Math.floor(newX)] === 0) playerX = newX;
     if (map[Math.floor(newY) * mapSize + Math.floor(playerX)] === 0) playerY = newY;
@@ -258,6 +332,16 @@ function update(dt) {
             rifleClip = toLoad;
             reloadUi.innerText = "";
             if (currentWeapon === 'rifle') weaponUi.innerText = `RIFLE [2] (${rifleClip}/30)`;
+        }
+    }
+
+    // Ракетная перезарядка
+    if (!rocketLoaded) {
+        rocketReloadTimer -= dt;
+        if (rocketReloadTimer <= 0) {
+            rocketLoaded = true;
+            reloadUi.innerText = "";
+            if (currentWeapon === 'rocket') weaponUi.innerText = `ROCKET [3] (READY)`;
         }
     }
 
@@ -329,6 +413,65 @@ function getWallColors(wallType, yPixel, wallHeight) {
     }
 }
 
+function renderMinimap() {
+    const minimapX = canvas.width - 160;
+    const minimapY = 10;
+    const minimapSize = 150;
+    const cellSize = minimapSize / mapSize;
+    
+    // Фон мини-карты
+    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+    ctx.fillRect(minimapX, minimapY, minimapSize, minimapSize);
+    ctx.strokeStyle = "#00ff00";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(minimapX, minimapY, minimapSize, minimapSize);
+    
+    // Стены на мини-карте
+    for (let y = 0; y < mapSize; y++) {
+        for (let x = 0; x < mapSize; x++) {
+            if (map[y * mapSize + x] > 0) {
+                ctx.fillStyle = "#444444";
+                ctx.fillRect(minimapX + x * cellSize, minimapY + y * cellSize, cellSize, cellSize);
+            }
+        }
+    }
+    
+    // Враги на мини-карте
+    enemies.forEach(enemy => {
+        let mmX = minimapX + (enemy.x / mapSize) * minimapSize;
+        let mmY = minimapY + (enemy.y / mapSize) * minimapSize;
+        
+        if (enemy.type === 'boss') {
+            ctx.fillStyle = "#ff00ff";
+            ctx.fillRect(mmX - 4, mmY - 4, 8, 8);
+        } else if (enemy.type === 'creeper') {
+            ctx.fillStyle = "#00ff00";
+            ctx.fillRect(mmX - 3, mmY - 3, 6, 6);
+        } else {
+            ctx.fillStyle = "#ffff00";
+            ctx.fillRect(mmX - 3, mmY - 3, 6, 6);
+        }
+    });
+    
+    // Игрок на мини-карте
+    let playerMMX = minimapX + (playerX / mapSize) * minimapSize;
+    let playerMMY = minimapY + (playerY / mapSize) * minimapSize;
+    ctx.fillStyle = "#ff0000";
+    ctx.beginPath();
+    ctx.arc(playerMMX, playerMMY, 4, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Направление взгляда
+    let dirX = playerMMX + Math.cos(playerAngle) * 12;
+    let dirY = playerMMY + Math.sin(playerAngle) * 12;
+    ctx.strokeStyle = "#ff0000";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(playerMMX, playerMMY);
+    ctx.lineTo(dirX, dirY);
+    ctx.stroke();
+}
+
 function render() {
     ctx.fillStyle = "#0c0512"; ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
     ctx.fillStyle = "#170f0d"; ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
@@ -383,48 +526,70 @@ function render() {
         .map(e => ({ ...e, dist: Math.hypot(e.x - playerX, e.y - playerY) }))
         .sort((a, b) => b.dist - a.dist)
         .forEach(enemy => {
-            let spriteAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX) - playerAngle;
-            while (spriteAngle < -Math.PI) spriteAngle += Math.PI * 2;
-            while (spriteAngle > Math.PI) spriteAngle -= Math.PI * 2;
+            const spriteAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX) - playerAngle;
+            let ang = spriteAngle;
+            while (ang < -Math.PI) ang += Math.PI * 2;
+            while (ang > Math.PI) ang -= Math.PI * 2;
 
-            if (Math.abs(spriteAngle) < HALF_FOV + 0.2) {
-                let spriteScreenHeight = Math.min(canvas.height, (canvas.height / enemy.dist));
-                let screenX = Math.tan(spriteAngle) * (canvas.width / 2) + (canvas.width / 2);
-                let screenY = (canvas.height / 2) + (spriteScreenHeight / 2);
-                let spriteWidth = spriteScreenHeight * enemy.size * 2;
+            if (Math.abs(ang) >= HALF_FOV + 0.2) return;
 
-                ctx.save();
-                ctx.translate(screenX, screenY);
-                
-                let centerRayIndex = Math.floor(screenX);
-                if (centerRayIndex >= 0 && centerRayIndex < canvas.width && enemy.dist < depthBuffer[centerRayIndex]) {
+            const spriteScreenHeight = Math.min(canvas.height, (canvas.height / enemy.dist));
+            const screenX = Math.tan(ang) * (canvas.width / 2) + (canvas.width / 2);
+            const screenY = (canvas.height / 2) + (spriteScreenHeight / 2);
+            const spriteWidth = spriteScreenHeight * enemy.size * 2;
+
+            ctx.save();
+            ctx.translate(screenX, screenY);
+
+            const centerRayIndex = Math.floor(screenX);
+            const isOnScreen = centerRayIndex >= 0 && centerRayIndex < canvas.width && enemy.dist > 0.1;
+
+            if (isOnScreen) {
+                const wallDist = depthBuffer[centerRayIndex];
+                if (wallDist !== undefined && enemy.dist >= wallDist * 1.05) {
+                    // за стеной — не рисуем
+                } else {
+                    // Рисование спрайта по типу
                     if (enemy.type === 'boss') {
-                        // Коронованный Огненный Босс
-                        ctx.fillStyle = "#ff0055"; // Яркая основа
-                        ctx.fillRect(-spriteWidth/2, -spriteScreenHeight, spriteWidth, spriteScreenHeight);
-                        // Золотая корона
-                        ctx.fillStyle = "#ffd700";
-                        ctx.fillRect(-spriteWidth/2, -spriteScreenHeight - spriteScreenHeight/6, spriteWidth, spriteScreenHeight/6);
-                        // Огромные светящиеся глаза
-                        ctx.fillStyle = "#ffffff";
-                        ctx.fillRect(-spriteWidth/3, -spriteScreenHeight + spriteScreenHeight/4, spriteWidth/4, spriteScreenHeight/5);
-                        ctx.fillRect(spriteWidth/12, -spriteScreenHeight + spriteScreenHeight/4, spriteWidth/4, spriteScreenHeight/5);
+                        ctx.fillStyle = "#ff0000"; // левая
+                        ctx.fillRect(-spriteWidth / 2, -spriteScreenHeight, spriteWidth / 2, spriteScreenHeight);
+                        ctx.fillStyle = "#0000ff"; // правая
+                        ctx.fillRect(0, -spriteScreenHeight, spriteWidth / 2, spriteScreenHeight);
+                        ctx.fillStyle = "#ffd700"; // корона
+                        ctx.fillRect(-spriteWidth / 2, -spriteScreenHeight - spriteScreenHeight / 6, spriteWidth, spriteScreenHeight / 6);
+                        ctx.fillStyle = "#ffff00"; // глаза
+                        ctx.fillRect(-spriteWidth / 3, -spriteScreenHeight + spriteScreenHeight / 4, spriteWidth / 4, spriteScreenHeight / 5);
+                        ctx.fillRect(spriteWidth / 12, -spriteScreenHeight + spriteScreenHeight / 4, spriteWidth / 4, spriteScreenHeight / 5);
                     } else if (enemy.type === 'creeper') {
                         ctx.fillStyle = "#111111";
-                        ctx.fillRect(-spriteWidth/2, -spriteScreenHeight, spriteWidth, spriteScreenHeight);
+                        ctx.fillRect(-spriteWidth / 2, -spriteScreenHeight, spriteWidth, spriteScreenHeight);
                         ctx.fillStyle = "#ff2222";
-                        ctx.fillRect(-spriteWidth/4, -spriteScreenHeight + spriteScreenHeight/5, spriteWidth/5, spriteScreenHeight/5);
-                        ctx.fillRect(spriteWidth/12, -spriteScreenHeight + spriteScreenHeight/5, spriteWidth/5, spriteScreenHeight/5);
+                        ctx.fillRect(-spriteWidth / 4, -spriteScreenHeight + spriteScreenHeight / 5, spriteWidth / 5, spriteScreenHeight / 5);
+                        ctx.fillRect(spriteWidth / 12, -spriteScreenHeight + spriteScreenHeight / 5, spriteWidth / 5, spriteScreenHeight / 5);
                     } else {
                         ctx.fillStyle = "#7b1fa2";
-                        ctx.fillRect(-spriteWidth/2, -spriteScreenHeight, spriteWidth, spriteScreenHeight);
+                        ctx.fillRect(-spriteWidth / 2, -spriteScreenHeight, spriteWidth, spriteScreenHeight);
                         ctx.fillStyle = "#00ffff";
-                        ctx.fillRect(-spriteWidth/4, -spriteScreenHeight + spriteScreenHeight/5, spriteWidth/6, spriteScreenHeight/6);
-                        ctx.fillRect(spriteWidth/12, -spriteScreenHeight + spriteScreenHeight/5, spriteWidth/6, spriteScreenHeight/6);
+                        ctx.fillRect(-spriteWidth / 4, -spriteScreenHeight + spriteScreenHeight / 5, spriteWidth / 6, spriteScreenHeight / 6);
+                        ctx.fillRect(spriteWidth / 12, -spriteScreenHeight + spriteScreenHeight / 5, spriteWidth / 6, spriteScreenHeight / 6);
                     }
+
+                    // Полоса здоровья
+                    const barWidth = Math.min(spriteWidth, 80);
+                    const barHeight = 6;
+                    const healthRatio = Math.max(0, enemy.health / (enemy.maxHealth || 1));
+                    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                    ctx.fillRect(-barWidth / 2, -spriteScreenHeight - 12, barWidth, barHeight);
+                    ctx.fillStyle = enemy.type === 'boss' ? '#ff0055' : (enemy.type === 'creeper' ? '#00ff00' : '#7b1fa2');
+                    ctx.fillRect(-barWidth / 2, -spriteScreenHeight - 12, barWidth * healthRatio, barHeight);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '10px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(Math.max(0, Math.floor(enemy.health)), 0, -spriteScreenHeight - 16);
                 }
-                ctx.restore();
             }
+
+            ctx.restore();
         });
 
     // РЕНДЕР ОРУЖИЯ И АНИМАЦИЙ ВСПЫШЕК
@@ -469,6 +634,9 @@ function render() {
         ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "#ff3333"; ctx.font = "bold 45px monospace"; ctx.textAlign = "center"; ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
     }
+    
+    // Отрисовка мини-карты
+    renderMinimap();
 }
 
 let lastTime = performance.now();
