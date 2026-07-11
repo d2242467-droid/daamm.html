@@ -88,7 +88,8 @@ const JUMP_VELOCITY = 8.0;
 const FOV = Math.PI / 3;
 const HALF_FOV = FOV / 2;
 const numRays = canvas.width;
-const renderDistance = 32; 
+const renderDistance = 64; 
+const WEAPON_HIT_RANGE = 64;
 const depthBuffer = new Array(numRays);
 
 // Оружие и инвентарь
@@ -110,16 +111,29 @@ let rocketLoaded = true;
 let rocketReloadTimer = 0;
 const rocketReloadDuration = 3.0;
 
+// Таймеры спавна врагов
+let regularSpawnTimer = 0;
+let bossSpawnTimer = 0;
+let hasBoss = false;
+
 // Урон (в новых единицах по просьбе)
 const SHOTGUN_DAMAGE = 20;
 const RIFLE_DAMAGE = 10;
 const ROCKET_DAMAGE = 100;
 
-// Враги и таймеры спавна
+// Враги на карте
 let enemies = [];
-let regularSpawnTimer = 0;
-let bossSpawnTimer = 0;
-let hasBoss = false;
+
+// Индикаторы урона (красные полоски вокруг прицела)
+let damageIndicators = [];  // [{angle, time, maxTime}, ...]
+
+function addDamageIndicator(sourceAngle) {
+    damageIndicators.push({
+        angle: sourceAngle,
+        time: 0,
+        maxTime: 0.5  // показывать 0.5 сек
+    });
+}
 
 function spawnEnemy(isBoss = false) {
     let spawned = false;
@@ -192,7 +206,7 @@ document.addEventListener('pointerlockchange', () => {
     isMouseLocked = (document.pointerLockElement === canvas || document.mozPointerLockElement === canvas);
 });
 
-// Управление камерой мышкой
+// Управление камерою мышкою
 canvas.addEventListener('mousemove', (e) => {
     if (isMouseLocked) {
         let deltaX = e.movementX || e.mozMovementX || 0;
@@ -201,8 +215,8 @@ canvas.addEventListener('mousemove', (e) => {
         // Горизонтальный поворот (по оси Y для FPS)
         playerAngle += deltaX * 0.003;
         
-        // Вертикальный наклон (pitch) - вверх/вниз
-        playerPitch += deltaY * 0.003;
+        // Вертикальный наклон (pitch) - вверх/вниз (МиНУС для правильного управления)
+        playerPitch -= deltaY * 0.003;
         // Ограничиваем угол по вертикали (±60 градусов)
         playerPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, playerPitch));
     }
@@ -292,7 +306,7 @@ function checkHit(fovSpread, damage) {
         // Используем fovSpread как радиус для попадания
         if (angleDiff < fovSpread || angleDiff > Math.PI - fovSpread) {
             let dist = Math.hypot(enemy.x - playerX, enemy.y - playerY);
-            if (dist < minEnemyDist && hasLineOfSight(enemy)) {
+            if (dist < minEnemyDist && dist <= WEAPON_HIT_RANGE && hasLineOfSight(enemy)) {
                 minEnemyDist = dist;
                 hitTarget = enemy;
             }
@@ -399,6 +413,12 @@ function update(dt) {
         }
     }
 
+    // Обновить индикаторы урона
+    damageIndicators = damageIndicators.filter(indicator => {
+        indicator.time += dt;
+        return indicator.time < indicator.maxTime;
+    });
+
     // ТАЙМЕРЫ СПАВНА
     regularSpawnTimer += dt;
     if (regularSpawnTimer >= 30) {
@@ -451,6 +471,10 @@ function update(dt) {
             }
             health = Math.max(0, Math.floor(health));
             healthUi.innerText = health;
+            
+            // Добавить индикатор урона от этого врага
+            const enemyAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX);
+            addDamageIndicator(enemyAngle);
         }
         return true;
     });
@@ -783,6 +807,31 @@ function render() {
     ctx.beginPath();
     ctx.arc(centerX, centerY, 3, 0, Math.PI * 2);
     ctx.fill();
+    
+    // Отрисовка индикаторов урона вокруг прицела
+    damageIndicators.forEach(indicator => {
+        const relativeAngle = indicator.angle - playerAngle;
+        // Нормализуем угол в диапазон [-PI, PI]
+        let normalizedAngle = relativeAngle;
+        while (normalizedAngle < -Math.PI) normalizedAngle += Math.PI * 2;
+        while (normalizedAngle > Math.PI) normalizedAngle -= Math.PI * 2;
+        
+        // Если враг достаточно близко к центру прицела, показываем индикатор
+        const screenX = centerX + Math.cos(normalizedAngle) * 50;
+        const screenY = centerY + Math.sin(normalizedAngle) * 50;
+        
+        // Фактор прозрачности (исчезает со временем)
+        const alpha = 1 - (indicator.time / indicator.maxTime);
+        
+        // Рисуем красную полоску в направлении источника урона
+        ctx.strokeStyle = `rgba(255, 0, 0, ${alpha})`;
+        ctx.lineWidth = 8;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(screenX - Math.cos(normalizedAngle) * 15, screenY - Math.sin(normalizedAngle) * 15);
+        ctx.lineTo(screenX + Math.cos(normalizedAngle) * 10, screenY + Math.sin(normalizedAngle) * 10);
+        ctx.stroke();
+    });
     
     // Отрисовка мини-карты
     renderMinimap();
