@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Doom 3D: ULTIMATE BOSS UPDATE</title>
-    <!-- Подключаем Tailwind CSS для красивой стилизации UI -->
+    <title>Minecraft Doom 3D: BRAWL STARS ULTIMATE UPDATE</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Подключаем библиотеку Three.js для WebGL рендеринга -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -87,12 +85,12 @@
             overflow-y: auto;
         }
         .overlay h1 {
-            font-size: 38px;
+            font-size: 36px;
             color: #ff2a2a;
             text-shadow: 0 0 15px rgba(255, 42, 42, 0.7);
             margin-bottom: 12px;
             text-align: center;
-            letter-spacing: 4px;
+            letter-spacing: 3px;
             font-weight: 900;
         }
         .overlay p {
@@ -116,13 +114,8 @@
             transition: all 0.1s ease;
             text-shadow: 1px 1px 2px #000;
         }
-        .btn:hover {
-            background: #ff4444;
-        }
-        .btn:active {
-            transform: translateY(4px);
-            box-shadow: 0 1px 0 #990000;
-        }
+        .btn:hover { background: #ff4444; }
+        .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #990000; }
         #audio-toggle {
             position: absolute;
             top: 15px;
@@ -148,14 +141,8 @@
             border-radius: 3px;
             margin-left: 5px;
         }
-        .shop-btn-small:hover {
-            background: #ff2a2a;
-        }
-
-        .shop-title {
-            color: #ffd700 !important;
-            text-shadow: 0 0 15px rgba(255, 215, 0, 0.7) !important;
-        }
+        .shop-btn-small:hover { background: #ff2a2a; }
+        .shop-title { color: #ffd700 !important; text-shadow: 0 0 15px rgba(255, 215, 0, 0.7) !important; }
         .shop-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -175,18 +162,8 @@
             align-items: center;
             text-align: center;
         }
-        .shop-item h3 {
-            font-size: 14px;
-            color: #e0aaff;
-            margin-bottom: 4px;
-            font-weight: bold;
-        }
-        .shop-item p {
-            font-size: 11px;
-            color: #b39ddb;
-            margin-bottom: 8px;
-            max-width: 100%;
-        }
+        .shop-item h3 { font-size: 14px; color: #e0aaff; margin-bottom: 4px; font-weight: bold; }
+        .shop-item p { font-size: 11px; color: #b39ddb; margin-bottom: 8px; max-width: 100%; }
         .buy-btn {
             background: #3a0ca3;
             color: white;
@@ -200,60 +177,86 @@
             font-weight: bold;
             transition: background 0.2s;
         }
-        .buy-btn:hover {
-            background: #4cc9f0;
-            color: #000;
+        .buy-btn:hover { background: #4cc9f0; color: #000; }
+        .buy-btn:disabled { background: #2b2b2b; border-color: #444; color: #888; cursor: not-allowed; }
+        #shop-score { font-size: 16px; color: #ffd700; margin-bottom: 10px; font-weight: bold; }
+
+        /* ПРИЦЕЛ И ИНДИКАТОРЫ УРОНА */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid rgba(255, 0, 50, 0.85);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 25;
+            box-shadow: 0 0 8px #ff0033;
         }
-        .buy-btn:disabled {
-            background: #2b2b2b;
-            border-color: #444;
-            color: #888;
-            cursor: not-allowed;
+        #damage-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 24;
         }
-        #shop-score {
-            font-size: 16px;
-            color: #ffd700;
-            margin-bottom: 10px;
-            font-weight: bold;
+        .damage-arc {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 220px;
+            height: 220px;
+            border-top: 6px solid rgba(255, 0, 40, 0.95);
+            border-radius: 50%;
+            pointer-events: none;
+            transform-origin: center center;
+            animation: dmgArcFade 0.6s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+            filter: drop-shadow(0 0 10px red);
+        }
+        @keyframes dmgArcFade {
+            0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--deg)) scale(0.65); }
+            100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--deg)) scale(1.15); }
         }
     </style>
 </head>
 <body>
 
     <button id="audio-toggle" onclick="toggleAudio()">МУЗЫКА: ВЫКЛ</button>
-
     <div id="boss-ui">⚠ ВНИМАНИЕ: БОСС БЛИЗКО (HP: <span id="boss-hp">1000</span>/1000) ⚠</div>
     
     <div id="game-container">
-        <!-- Стартовый экран -->
+        <div id="crosshair"></div>
+        <div id="damage-container"></div>
+
         <div id="start-overlay" class="overlay">
             <h1>MINECRAFT DOOM 3D</h1>
-            <p>Уничтожайте Криперов и Скелетов в полном WebGL 3D! Остерегайтесь грозного БОССА, который появляется каждые 3 минуты!<br><br>
+            <p>Уничтожайте Криперов и Скелетов! Улучшенный Дробовик наносит х2 урон (2 патрона в стволе).<br><br>
                Управление: <br>
                <b>WASD / Стрелки</b> — Движение<br>
-               <b>Мышь</b> — Обзор во все стороны (захват курсора)<br>
-               <b>ЛКМ</b> — Стрельба (Зажмите для автоматического огня)<br>
-               <b>Пробел</b> — Прыжок (можно забираться на синие платформы)<br>
-               <b>Клавиша E</b> — Открыть/Закрыть Магазин Улучшений<br>
-               <b>Цифры 1, 2, 3</b> — Смена оружия (автомат и ракетницу нужно сначала купить)
+               <b>Мышь</b> — Обзор во все стороны<br>
+               <b>ЛКМ</b> — Стрельба | <b>R</b> — Перезарядка<br>
+               <b>Пробел</b> — Прыжок | <b>E</b> — Магазин Улучшений<br>
+               <b>1, 2, 3</b> — Смена оружия
             </p>
-            <p class="text-[#e0aaff] mb-2 text-sm">Выберите сложность:</p>
+            <p class="text-[#e0aaff] mb-2 text-sm">Выберите сложность (Арена Brawl Stars):</p>
             <div class="flex gap-3 mb-4">
-                <button class="btn" style="background:#2b6b2b; box-shadow:0 5px 0 #164016; font-size:14px; padding:8px 18px;" onclick="startGame('EASY')">ЛЕГКО</button>
-                <button class="btn" style="background:#b38600; box-shadow:0 5px 0 #664c00; font-size:14px; padding:8px 18px;" onclick="startGame('MEDIUM')">СРЕДНЕ</button>
-                <button class="btn" style="background:#ff2a2a; box-shadow:0 5px 0 #990000; font-size:14px; padding:8px 18px;" onclick="startGame('HARD')">СЛОЖНО</button>
+                <button class="btn" style="background:#2b6b2b; box-shadow:0 5px 0 #164016; font-size:14px; padding:8px 18px;" onclick="startGame('EASY')">ЛЕГКО (КЛАССИКА)</button>
+                <button class="btn" style="background:#b38600; box-shadow:0 5px 0 #664c00; font-size:14px; padding:8px 18px;" onclick="startGame('MEDIUM')">СРЕДНЕ (ШОРОХ ЛИСТЬЕВ)</button>
+                <button class="btn" style="background:#ff2a2a; box-shadow:0 5px 0 #990000; font-size:14px; padding:8px 18px;" onclick="startGame('HARD')">СЛОЖНО (ПАДАЮЩАЯ ЗВЕЗДА)</button>
             </div>
 
             <div class="border-t border-white/10 pt-3 w-full max-w-xs">
-                <button class="btn" style="background:#333; box-shadow:0 5px 0 #111; font-size:12px; padding:6px 14px;" onclick="toggleMpPanel()">МУЛЬТИПЛЕЕР (СОВМЕСТНЫЙ РЕЖИМ)</button>
+                <button class="btn" style="background:#333; box-shadow:0 5px 0 #111; font-size:12px; padding:6px 14px;" onclick="toggleMpPanel()">МУЛЬТИПЛЕЕР</button>
                 <div id="mp-panel" style="display:none;" class="mt-3 text-left">
-                    <label class="text-[11px] text-[#bbb]">Адрес сервера (ws:// или wss://)</label>
                     <input id="mp-url" type="text" placeholder="wss://your-server.onrender.com" class="w-full p-2 my-1 border rounded bg-[#111] text-white text-xs border-[#555]">
-                    <label class="text-[11px] text-[#bbb]">Код комнаты</label>
                     <input id="mp-room" type="text" placeholder="FRIENDS1" class="w-full p-2 my-1 border rounded bg-[#111] text-white text-xs border-[#555]">
-                    <label class="text-[11px] text-[#bbb]">Ваше имя</label>
                     <input id="mp-name" type="text" placeholder="Игрок" class="w-full p-2 my-1 border rounded bg-[#111] text-white text-xs border-[#555]">
-                    <p class="text-[10px] text-[#888] my-1">Сложность (для новой комнаты):</p>
                     <select id="mp-difficulty" class="w-full p-2 mb-2 border rounded bg-[#111] text-white text-xs border-[#555]">
                         <option value="EASY">ЛЕГКО</option>
                         <option value="MEDIUM">СРЕДНЕ</option>
@@ -265,63 +268,52 @@
             </div>
         </div>
 
-        <!-- Экран Магазина -->
         <div id="shop-overlay" class="overlay" style="display:none;">
             <h1 class="shop-title">МАГАЗИН УЛУЧШЕНИЙ</h1>
             <div id="shop-score">ВАШ СЧЕТ (ВАЛЮТА): 0</div>
-            
             <div class="shop-grid">
                 <div class="shop-item">
                     <h3>Макс. Здоровье</h3>
                     <p id="desc-health">Текущее: 100 HP. Позволяет выживать дольше в бою.</p>
                     <button class="buy-btn" id="btn-buy-health" onclick="buyUpgrade('health')">Улучшить (+25 HP) <br> <span id="cost-health">300</span> очков</button>
                 </div>
-                
                 <div class="shop-item">
                     <h3>Сила Атаки</h3>
                     <p id="desc-damage">Текущий урон: +0%. Увеличивает урон всех орудий.</p>
                     <button class="buy-btn" id="btn-buy-damage" onclick="buyUpgrade('damage')">Улучшить (+15%) <br> <span id="cost-damage">400</span> очков</button>
                 </div>
-                
                 <div class="shop-item">
                     <h3>Купить Автомат</h3>
                     <p>Скорострельное плазменное оружие. Отлично подходит для скелетов.</p>
                     <button class="buy-btn" id="btn-buy-rifle" onclick="buyUpgrade('rifle')">Разблокировать [2] <br> <span id="cost-rifle">800</span> очков</button>
                 </div>
-                
                 <div class="shop-item">
                     <h3>Купить Ракетницу</h3>
                     <p>Стреляет взрывными снарядами. Наносит урон по площади.</p>
                     <button class="buy-btn" id="btn-buy-rocket" onclick="buyUpgrade('rocket')">Разблокировать [3] <br> <span id="cost-rocket">1500</span> очков</button>
                 </div>
-
                 <div class="shop-item" style="grid-column: span 2;">
                     <h3>Поставка Боеприпасов</h3>
-                    <p>Пополняет ваш боекомплект.</p>
+                    <p>Пополняет ваш общий боекомплект.</p>
                     <button class="buy-btn" id="btn-buy-ammo" onclick="buyUpgrade('ammo')">Купить (+50 патронов) <br> <span id="cost-ammo">150</span> очков</button>
                 </div>
             </div>
-            
             <button class="btn" style="background: #7209b7;" onclick="toggleShop()">ВЕРНУТЬСЯ В БОЙ</button>
         </div>
 
-        <!-- Экран Game Over -->
         <div id="death-overlay" class="overlay" style="display: none;">
             <h1 style="color: #ff0033; text-shadow: 0 0 20px red;">ВЫ ПОГИБЛИ</h1>
             <p id="death-stats">Вы набрали: 0 очков</p>
             <button class="btn" onclick="restartGame()">ВОЗРОДИТЬСЯ</button>
         </div>
 
-        <!-- Слой для 3D WebGL вывода -->
         <canvas id="gameCanvas"></canvas>
-
-        <!-- Мини-карта вынесена на отдельный наложенный Canvas, чтобы не засорять 3D буфер -->
         <canvas id="minimapCanvas" width="150" height="150" class="absolute top-3 right-3 border-2 border-[#ff0055] rounded-md bg-black/80 z-20"></canvas>
     </div>
 
     <div id="ui">
         <div>ЗДОРОВЬЕ: <span id="health-val">100</span>%</div>
-        <div>ОРУЖИЕ: <span id="weapon-name" style="color: #fff;">ДРОБОВИК [1]</span></div>
+        <div>ОРУЖИЕ: <span id="weapon-name" style="color: #fff;">ДРОБОВИК [1] (2/2)</span></div>
         <div>ПАТРОНЫ: <span id="ammo-val">100</span> <span id="reload-msg" style="color: yellow;"></span></div>
         <div>СЧЕТ: <span id="score-val">0</span></div>
         <div>СЛОЖНОСТЬ: <span id="difficulty-val" style="color:#ffd700;">ЛЕГКО</span></div>
@@ -344,40 +336,116 @@ const reloadUi = document.getElementById("reload-msg");
 let gameState = 'START'; 
 
 const mapSize = 32;
-const map = [
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
-    1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
-    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
-    1,0,2,2,0,0,0,0,0,0,0,0,5,5,2,0,0,2,5,5,0,0,0,0,0,0,0,0,2,2,0,1,
-    1,0,2,2,0,0,0,0,0,2,2,2,5,5,0,0,0,0,5,5,2,2,2,0,0,0,0,0,2,2,0,1,
-    1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,1,
-    1,0,0,0,4,4,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,4,4,0,0,0,1,
-    1,0,1,0,4,4,0,0,5,5,0,0,0,5,5,0,0,5,5,0,0,0,5,5,0,0,4,4,0,1,0,1,
-    1,0,0,0,0,0,2,2,2,0,0,0,0,5,0,0,0,0,5,0,0,0,0,2,2,2,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,2,2,2,0,0,0,0,5,0,0,0,0,5,0,0,0,0,2,2,2,0,0,0,0,0,1,
-    1,0,1,0,4,4,0,0,5,5,0,0,0,5,5,0,0,5,5,0,0,0,5,5,0,0,4,4,0,1,0,1,
-    1,0,0,0,4,4,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,4,4,0,0,0,1,
-    1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,
-    1,0,2,2,0,0,0,0,0,2,2,2,5,5,0,0,0,0,5,5,2,2,2,0,0,0,0,0,2,2,0,1,
-    1,0,2,2,0,0,0,0,0,0,0,0,5,5,2,0,0,2,5,5,0,0,0,0,0,0,0,0,2,2,0,1,
-    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
-    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,
-    1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-];
+
+// КАРТЫ BRAWL STARS (32x32)
+const MAPS = {
+    // 1. Классическая карта (Легко)
+    EASY: [
+        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
+        1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+        1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+        1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+        1,0,2,2,0,0,0,0,0,0,0,0,5,5,2,0,0,2,5,5,0,0,0,0,0,0,0,0,2,2,0,1,
+        1,0,2,2,0,0,0,0,0,2,2,2,5,5,0,0,0,0,5,5,2,2,2,0,0,0,0,0,2,2,0,1,
+        1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,1,
+        1,0,0,0,4,4,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,4,4,0,0,0,1,
+        1,0,1,0,4,4,0,0,5,5,0,0,0,5,5,0,0,5,5,0,0,0,5,5,0,0,4,4,0,1,0,1,
+        1,0,0,0,0,0,2,2,2,0,0,0,0,5,0,0,0,0,5,0,0,0,0,2,2,2,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,2,2,2,0,0,0,0,5,0,0,0,0,5,0,0,0,0,2,2,2,0,0,0,0,0,1,
+        1,0,1,0,4,4,0,0,5,5,0,0,0,5,5,0,0,5,5,0,0,0,5,5,0,0,4,4,0,1,0,1,
+        1,0,0,0,4,4,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,4,4,0,0,0,1,
+        1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,
+        1,0,2,2,0,0,0,0,0,2,2,2,5,5,0,0,0,0,5,5,2,2,2,0,0,0,0,0,2,2,0,1,
+        1,0,2,2,0,0,0,0,0,0,0,0,5,5,2,0,0,2,5,5,0,0,0,0,0,0,0,0,2,2,0,1,
+        1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+        1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+        1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,
+        1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    ],
+    // 2. Шорох листьев / Rustling Leaves (Средне - много кустов и фланговых коридоров)
+    MEDIUM: [
+        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+        1,0,0,0,3,3,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,3,3,0,0,0,1,
+        1,0,0,0,3,3,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,3,3,0,0,0,1,
+        1,0,3,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,3,0,1,
+        1,0,3,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,3,0,1,
+        1,0,0,0,2,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,2,0,0,0,1,
+        1,0,0,0,2,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,2,0,0,0,1,
+        1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
+        1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
+        1,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,1,
+        1,0,0,0,3,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,3,0,0,0,1,
+        1,0,2,2,0,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,0,2,2,0,1,
+        1,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,1,
+        1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
+        1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
+        1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
+        1,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,1,
+        1,0,2,2,0,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,0,2,2,0,1,
+        1,0,0,0,3,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,3,0,0,0,1,
+        1,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,1,
+        1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
+        1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
+        1,0,0,0,2,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,2,0,0,0,1,
+        1,0,0,0,2,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,2,0,0,0,1,
+        1,0,3,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,3,0,1,
+        1,0,3,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,3,0,1,
+        1,0,0,0,3,3,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,3,3,0,0,0,1,
+        1,0,0,0,3,3,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,3,3,0,0,0,1,
+        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    ],
+    // 3. Падающая звезда / Shooting Star (Сложно - диагональные блоки, открытый центр, снайперские прострелы)
+    HARD: [
+        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+        1,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,1,
+        1,0,5,5,0,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,0,5,5,0,1,
+        1,0,5,5,0,0,0,0,4,4,0,0,0,0,5,5,5,5,0,0,0,0,4,4,0,0,0,0,5,5,0,1,
+        1,0,0,0,0,0,0,4,4,0,0,0,0,0,5,5,5,5,0,0,0,0,0,4,4,0,0,0,0,0,0,1,
+        1,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,1,
+        1,0,0,0,0,4,4,0,0,0,5,5,0,0,0,0,0,0,0,0,5,5,0,0,0,4,4,0,0,0,0,1,
+        1,0,0,0,4,4,0,0,0,5,5,5,0,0,0,0,0,0,0,0,5,5,5,0,0,0,4,4,0,0,0,1,
+        1,0,0,4,4,0,0,0,0,5,5,0,0,0,0,4,4,0,0,0,0,5,5,0,0,0,0,4,4,0,0,1,
+        1,0,4,4,0,0,0,0,0,0,0,0,0,0,4,4,4,4,0,0,0,0,0,0,0,0,0,0,4,4,0,1,
+        1,4,4,0,0,0,5,5,0,0,0,0,0,4,4,0,0,4,4,0,0,0,0,0,5,5,0,0,0,4,4,1,
+        1,4,0,0,0,5,5,5,0,0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,5,5,5,0,0,0,4,1,
+        1,0,0,0,0,5,5,0,0,0,0,4,4,0,0,0,0,0,0,4,4,0,0,0,0,5,5,0,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,5,5,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,5,5,0,0,0,1,
+        1,0,0,0,5,5,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,5,5,0,0,0,1,
+        1,0,0,0,5,5,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,5,5,0,0,0,1,
+        1,0,0,0,5,5,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,5,5,0,0,0,1,
+        1,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,1,
+        1,0,0,0,0,5,5,0,0,0,0,4,4,0,0,0,0,0,0,4,4,0,0,0,0,5,5,0,0,0,0,1,
+        1,4,0,0,0,5,5,5,0,0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,5,5,5,0,0,0,4,1,
+        1,4,4,0,0,0,5,5,0,0,0,0,0,4,4,0,0,4,4,0,0,0,0,0,5,5,0,0,0,4,4,1,
+        1,0,4,4,0,0,0,0,0,0,0,0,0,0,4,4,4,4,0,0,0,0,0,0,0,0,0,0,4,4,0,1,
+        1,0,0,4,4,0,0,0,0,5,5,0,0,0,0,4,4,0,0,0,0,5,5,0,0,0,0,4,4,0,0,1,
+        1,0,0,0,4,4,0,0,0,5,5,5,0,0,0,0,0,0,0,0,5,5,5,0,0,0,4,4,0,0,0,1,
+        1,0,0,0,0,4,4,0,0,0,5,5,0,0,0,0,0,0,0,0,5,5,0,0,0,4,4,0,0,0,0,1,
+        1,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,1,
+        1,0,0,0,0,0,0,4,4,0,0,0,0,0,5,5,5,5,0,0,0,0,0,4,4,0,0,0,0,0,0,1,
+        1,0,5,5,0,0,0,0,4,4,0,0,0,0,5,5,5,5,0,0,0,0,4,4,0,0,0,0,5,5,0,1,
+        1,0,5,5,0,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,0,5,5,0,1,
+        1,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,1,
+        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    ]
+};
+let map = MAPS.EASY.slice();
 
 let playerX = 3.5;
 let playerY = 3.5;
@@ -394,25 +462,19 @@ const GRAVITY = 20.0;
 const JUMP_VELOCITY = 8.0;
 
 const DIFFICULTY_SETTINGS = {
-    EASY:   { label: "ЛЕГКО",  spawnInterval: 20, creeperHp: 50,  skeletonHp: 100, flyerHp: 100, bossHp: 1000, flyingEnemies: false, flyingBoss: false },
-    MEDIUM: { label: "СРЕДНЕ", spawnInterval: 10, creeperHp: 200, skeletonHp: 200, flyerHp: 200, bossHp: 2000, flyingEnemies: true,  flyingBoss: false },
-    HARD:   { label: "СЛОЖНО", spawnInterval: 10, creeperHp: 500, skeletonHp: 500, flyerHp: 500, bossHp: 5000, flyingEnemies: true,  flyingBoss: true  }
+    EASY:   { label: "ЛЕГКО (КЛАССИКА)",  spawnInterval: 20, creeperHp: 50,  skeletonHp: 100, flyerHp: 100, bossHp: 1000, flyingEnemies: false, flyingBoss: false },
+    MEDIUM: { label: "СРЕДНЕ (ШОРОХ ЛИСТЬЕВ)", spawnInterval: 10, creeperHp: 200, skeletonHp: 200, flyerHp: 200, bossHp: 2000, flyingEnemies: true,  flyingBoss: false },
+    HARD:   { label: "СЛОЖНО (ПАДАЮЩАЯ ЗВЕЗДА)",   spawnInterval: 10, creeperHp: 500, skeletonHp: 500, flyerHp: 500, bossHp: 5000, flyingEnemies: true,  flyingBoss: true  }
 };
 let difficulty = 'EASY';
 
-const multiplayer = {
-    enabled: false,
-    ws: null,
-    myId: null,
-    players: {},       
-    inputSendTimer: 0
-};
-
+const multiplayer = { enabled: false, ws: null, myId: null, players: {}, inputSendTimer: 0 };
 let weaponsUnlocked = { shotgun: true, rifle: false, rocket: false };
 let shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, ammo: 150 };
 
 let currentWeapon = 'shotgun'; 
 let ammo = 100; 
+let shotgunClip = 2; // УЛУЧШЕННЫЙ ДРОБОВИК: 2 патрона в магазине!
 let rifleClip = 30; 
 let isShooting = false;
 let shootTimer = 0;
@@ -431,52 +493,47 @@ let regularSpawnTimer = 0;
 let bossSpawnTimer = 0;
 let hasBoss = false;
 
-const BASE_SHOTGUN_DAMAGE = 20;
+// УЛУЧШЕННЫЙ ДРОБОВИК: урон увеличен ровно в 2 раза (было 20, стало 40)
+const BASE_SHOTGUN_DAMAGE = 40;
 const BASE_RIFLE_DAMAGE = 10;
 const BASE_ROCKET_DAMAGE = 100;
 
 let messageText = "";
 let messageTimer = 0;
-
-function showCenterMessage(text) {
-    messageText = text;
-    messageTimer = 2.5; 
-}
+function showCenterMessage(text) { messageText = text; messageTimer = 2.5; }
 
 let enemies = [];
 let projectiles = []; 
 let particles = [];   
 let pickups = [];     
-let damageIndicators = [];  
 
+// ФУНКЦИЯ ДОБАВЛЕНИЯ НАПРАВЛЕННОГО ИНДИКАТОРА УРОНА (ДУГА ВОКРУГ ПРИЦЕЛА)
 function addDamageIndicator(sourceAngle) {
-    damageIndicators.push({ angle: sourceAngle, time: 0, maxTime: 0.6 });
+    let relAngle = sourceAngle - playerAngle;
+    let degrees = (relAngle * 180 / Math.PI) - 90;
+    
+    let container = document.getElementById('damage-container');
+    if (!container) return;
+    let arc = document.createElement('div');
+    arc.className = 'damage-arc';
+    arc.style.setProperty('--deg', `${degrees}deg`);
+    container.appendChild(arc);
+    
+    setTimeout(() => arc.remove(), 600);
 }
 
 let scene, camera, renderer, torchLight;
 let mapBlocksGroup;
 let weaponPivot; 
 const entityMeshes = new Map(); 
-
-// Справочник 3D-моделей оружия
-let weaponMeshes = {
-    shotgun: null,
-    rifle: null,
-    rocket: null
-};
-
-// Процедурные текстуры
+let weaponMeshes = { shotgun: null, rifle: null, rocket: null };
 const textures = {};
 
 function makeProceduralNoiseTexture(colorBase, countX=16, countY=16) {
     const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = 128;
-    tempCanvas.height = 128;
+    tempCanvas.width = 128; tempCanvas.height = 128;
     const tctx = tempCanvas.getContext('2d');
-    
-    const sizeX = 128 / countX;
-    const sizeY = 128 / countY;
-    
+    const sizeX = 128 / countX; const sizeY = 128 / countY;
     for (let x = 0; x < countX; x++) {
         for (let y = 0; y < countY; y++) {
             const noise = (Math.random() - 0.5) * 35;
@@ -485,385 +542,202 @@ function makeProceduralNoiseTexture(colorBase, countX=16, countY=16) {
             const b = Math.min(255, Math.max(0, colorBase.b + noise));
             tctx.fillStyle = `rgb(${Math.floor(r)},${Math.floor(g)},${Math.floor(b)})`;
             tctx.fillRect(x * sizeX, y * sizeY, sizeX, sizeY);
-            
-            // Легкая рамка воксельного пикселя
-            tctx.strokeStyle = 'rgba(0,0,0,0.1)';
-            tctx.lineWidth = 1;
+            tctx.strokeStyle = 'rgba(0,0,0,0.1)'; tctx.lineWidth = 1;
             tctx.strokeRect(x * sizeX, y * sizeY, sizeX, sizeY);
         }
     }
     const texture = new THREE.CanvasTexture(tempCanvas);
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestFilter;
     return texture;
 }
 
 function initTextures() {
-    // 1: Каменная кладка (серый)
     textures[1] = makeProceduralNoiseTexture({ r: 90, g: 90, b: 90 }, 8, 8);
-    // 2: Дерево (коричневый)
     textures[2] = makeProceduralNoiseTexture({ r: 93, g: 64, b: 55 }, 4, 16);
-    // 3: Зеленый токсик/мох
     textures[3] = makeProceduralNoiseTexture({ r: 46, g: 125, b: 50 }, 8, 8);
-    // 4: Футуристические сине-оранжевые блоки
     textures[4] = makeProceduralNoiseTexture({ r: 21, g: 101, b: 192 }, 16, 16);
-    // 5: Обсидиан черный
     textures[5] = makeProceduralNoiseTexture({ r: 26, g: 26, b: 26 }, 16, 16);
-    // 6: Платформа синяя светящаяся
     textures[6] = makeProceduralNoiseTexture({ r: 0, g: 191, b: 255 }, 8, 8);
-    // Трава / пол
     textures['grass'] = makeProceduralNoiseTexture({ r: 35, g: 115, b: 35 }, 16, 16);
-    textures['grass'].wrapS = THREE.RepeatWrapping;
-    textures['grass'].wrapT = THREE.RepeatWrapping;
+    textures['grass'].wrapS = THREE.RepeatWrapping; textures['grass'].wrapT = THREE.RepeatWrapping;
     textures['grass'].repeat.set(32, 32);
 }
 
-let audioContext = null;
-let audioInitialized = false;
-let musicInterval = null;
-let isMusicPlaying = false;
-let synthVolume = 0.12; 
-
+let audioContext = null; let audioInitialized = false; let musicInterval = null; let isMusicPlaying = false; let synthVolume = 0.12; 
 function initAudio() {
     if (!audioInitialized) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         audioInitialized = true;
     }
-    if (audioContext.state === 'suspended') {
-        audioContext.resume();
-    }
+    if (audioContext.state === 'suspended') audioContext.resume();
     return audioContext;
 }
 
 function playShotgunSound() {
     if (!audioInitialized) return;
-    const ctx = audioContext;
-    const now = ctx.currentTime;
-    
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(140, now);
-    osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
-    
-    gain.gain.setValueAtTime(0.5, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.25);
-
-    const bufferSize = ctx.sampleRate * 0.15;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-    }
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.3, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-    noise.connect(noiseGain);
-    noiseGain.connect(ctx.destination);
-    noise.start(now);
+    const ctx = audioContext; const now = ctx.currentTime;
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(140, now); osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
+    gain.gain.setValueAtTime(0.5, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+    osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.25);
+    const bufferSize = ctx.sampleRate * 0.15; const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource(); noise.buffer = buffer; const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.3, now); noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    noise.connect(noiseGain); noiseGain.connect(ctx.destination); noise.start(now);
 }
 
 function playPlasmaSound() {
     if (!audioInitialized) return;
-    const ctx = audioContext;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(500, now);
-    osc.frequency.exponentialRampToValueAtTime(900, now + 0.08);
-    
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.1);
+    const ctx = audioContext; const now = ctx.currentTime;
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(500, now); osc.frequency.exponentialRampToValueAtTime(900, now + 0.08);
+    gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.1);
 }
 
 function playRocketLaunchSound() {
     if (!audioInitialized) return;
-    const ctx = audioContext;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(250, now);
-    osc.frequency.exponentialRampToValueAtTime(60, now + 0.3);
-    
-    gain.gain.setValueAtTime(0.6, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.35);
+    const ctx = audioContext; const now = ctx.currentTime;
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(250, now); osc.frequency.exponentialRampToValueAtTime(60, now + 0.3);
+    gain.gain.setValueAtTime(0.6, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+    osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.35);
 }
 
 function playExplosionSound() {
     if (!audioInitialized) return;
-    const ctx = audioContext;
-    const now = ctx.currentTime;
-    
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(90, now);
-    osc.frequency.exponentialRampToValueAtTime(10, now + 0.5);
-    
-    gain.gain.setValueAtTime(0.8, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.6);
-
-    const bufferSize = ctx.sampleRate * 0.5;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-    }
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.6, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
-    noise.connect(noiseGain);
-    noiseGain.connect(ctx.destination);
-    noise.start(now);
+    const ctx = audioContext; const now = ctx.currentTime;
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(90, now); osc.frequency.exponentialRampToValueAtTime(10, now + 0.5);
+    gain.gain.setValueAtTime(0.8, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+    osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.6);
+    const bufferSize = ctx.sampleRate * 0.5; const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource(); noise.buffer = buffer; const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.6, now); noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+    noise.connect(noiseGain); noiseGain.connect(ctx.destination); noise.start(now);
 }
 
 function playHurtSound() {
     if (!audioInitialized) return;
-    const ctx = audioContext;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(100, now);
-    osc.frequency.linearRampToValueAtTime(40, now + 0.15);
-    
-    gain.gain.setValueAtTime(0.4, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.2);
+    const ctx = audioContext; const now = ctx.currentTime;
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, now); osc.frequency.linearRampToValueAtTime(40, now + 0.15);
+    gain.gain.setValueAtTime(0.4, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.2);
 }
 
 function playPickupSound() {
     if (!audioInitialized) return;
-    const ctx = audioContext;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(330, now);
-    osc.frequency.setValueAtTime(440, now + 0.08);
-    osc.frequency.setValueAtTime(660, now + 0.16);
-    
-    gain.gain.setValueAtTime(0.25, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.25);
+    const ctx = audioContext; const now = ctx.currentTime;
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(330, now); osc.frequency.setValueAtTime(440, now + 0.08); osc.frequency.setValueAtTime(660, now + 0.16);
+    gain.gain.setValueAtTime(0.25, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+    osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.25);
 }
 
 function playReloadSound() {
     if (!audioInitialized) return;
-    const ctx = audioContext;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(200, now);
-    osc.frequency.setValueAtTime(400, now + 0.1);
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.2);
+    const ctx = audioContext; const now = ctx.currentTime;
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(200, now); osc.frequency.setValueAtTime(400, now + 0.1);
+    gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.2);
 }
 
-let bassSequence = [
-    110, 110, 130, 110, 0, 110, 146, 0,
-    110, 110, 130, 110, 0, 110, 165, 146,
-    110, 110, 130, 110, 0, 110, 146, 0,
-    110, 110, 130, 110, 165, 165, 220, 0
-];
-let leadSequence = [
-    0, 220, 0, 261, 293, 0, 329, 0,
-    0, 220, 0, 261, 392, 349, 329, 0,
-    0, 220, 0, 261, 293, 0, 329, 0,
-    0, 440, 392, 329, 293, 261, 220, 0
-];
+let bassSequence = [110, 110, 130, 110, 0, 110, 146, 0, 110, 110, 130, 110, 0, 110, 165, 146, 110, 110, 130, 110, 0, 110, 146, 0, 110, 110, 130, 110, 165, 165, 220, 0];
+let leadSequence = [0, 220, 0, 261, 293, 0, 329, 0, 0, 220, 0, 261, 392, 349, 329, 0, 0, 220, 0, 261, 293, 0, 329, 0, 0, 440, 392, 329, 293, 261, 220, 0];
 let musicStep = 0;
 
 function playDrumKick(ctx, now) {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.setValueAtTime(150, now);
-    osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.15);
-    gain.gain.setValueAtTime(0.4, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-    osc.start(now);
-    osc.stop(now + 0.15);
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.15);
+    gain.gain.setValueAtTime(0.4, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    osc.start(now); osc.stop(now + 0.15);
 }
 
 function playDrumSnare(ctx, now) {
-    const bufferSize = ctx.sampleRate * 0.12;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-    }
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    const gain = ctx.createGain();
-    source.connect(gain);
-    gain.connect(ctx.destination);
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-    source.start(now);
-    source.stop(now + 0.12);
+    const bufferSize = ctx.sampleRate * 0.12; const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const source = ctx.createBufferSource(); source.buffer = buffer; const gain = ctx.createGain();
+    source.connect(gain); gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    source.start(now); source.stop(now + 0.12);
 }
 
 function startBackgroundMusic() {
     if (musicInterval) clearInterval(musicInterval);
     musicInterval = setInterval(() => {
         if (!isMusicPlaying || !audioInitialized || gameState === 'SHOP') return;
-        const ctx = audioContext;
-        const now = ctx.currentTime;
-        
-        if (musicStep % 4 === 0) {
-            playDrumKick(ctx, now);
-        } else if (musicStep % 4 === 2) {
-            playDrumSnare(ctx, now);
-        }
-
+        const ctx = audioContext; const now = ctx.currentTime;
+        if (musicStep % 4 === 0) playDrumKick(ctx, now); else if (musicStep % 4 === 2) playDrumSnare(ctx, now);
         let bassNote = bassSequence[musicStep];
         if (bassNote > 0) {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(bassNote / 2, now); 
-            
-            gain.gain.setValueAtTime(synthVolume, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-            
-            const filter = ctx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(450, now);
-            
-            osc.connect(filter);
-            filter.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now);
-            osc.stop(now + 0.2);
+            const osc = ctx.createOscillator(); const gain = ctx.createGain();
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(bassNote / 2, now); 
+            gain.gain.setValueAtTime(synthVolume, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+            const filter = ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.setValueAtTime(450, now);
+            osc.connect(filter); filter.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.2);
         }
-
         let leadNote = leadSequence[musicStep];
         if (leadNote > 0 && Math.random() > 0.3) {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(leadNote, now);
-            
-            gain.gain.setValueAtTime(synthVolume * 0.4, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-            
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now);
-            osc.stop(now + 0.15);
+            const osc = ctx.createOscillator(); const gain = ctx.createGain();
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(leadNote, now);
+            gain.gain.setValueAtTime(synthVolume * 0.4, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+            osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.15);
         }
-
         musicStep = (musicStep + 1) % bassSequence.length;
     }, 150); 
 }
 
 function toggleAudio() {
-    initAudio();
-    isMusicPlaying = !isMusicPlaying;
+    initAudio(); isMusicPlaying = !isMusicPlaying;
     document.getElementById("audio-toggle").innerText = isMusicPlaying ? "МУЗЫКА: ВКЛ" : "МУЗЫКА: ВЫКЛ";
     document.getElementById("audio-toggle").style.color = isMusicPlaying ? "#00ff00" : "#ff2a2a";
     document.getElementById("audio-toggle").style.borderColor = isMusicPlaying ? "#00ff00" : "#ff2a2a";
-
-    if (isMusicPlaying) {
-        startBackgroundMusic();
-    }
+    if (isMusicPlaying) startBackgroundMusic();
 }
 
 function init3D() {
-    scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2('#11051a', 0.05);
-
+    scene = new THREE.Scene(); scene.fog = new THREE.FogExp2('#11051a', 0.05);
     camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 100);
-    camera.rotation.order = 'YXZ'; // Doom-подобное вращение обзора
-    scene.add(camera);
-
+    camera.rotation.order = 'YXZ'; scene.add(camera);
     renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio); renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     renderer.setClearColor('#11051a');
-
     initTextures();
 
-    // Создаем трехмерный пол (плоскость)
     const floorGeo = new THREE.PlaneGeometry(mapSize, mapSize);
     const floorMat = new THREE.MeshLambertMaterial({ map: textures['grass'] });
     const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(mapSize / 2, 0, mapSize / 2);
-    scene.add(floor);
+    floor.rotation.x = -Math.PI / 2; floor.position.set(mapSize / 2, 0, mapSize / 2); scene.add(floor);
 
-    // Добавляем освещение
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
-    scene.add(ambientLight);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+    const dirLight = new THREE.DirectionalLight(0xff77aa, 0.3); dirLight.position.set(16, 25, 16); scene.add(dirLight);
+    torchLight = new THREE.PointLight(0xff3333, 1.4, 15); camera.add(torchLight);
 
-    const dirLight = new THREE.DirectionalLight(0xff77aa, 0.3);
-    dirLight.position.set(16, 25, 16);
-    scene.add(dirLight);
-
-    // Динамический факел в руках игрока
-    torchLight = new THREE.PointLight(0xff3333, 1.4, 15);
-    camera.add(torchLight);
-
-    // Генерация геометрии карты блоков
     mapBlocksGroup = new THREE.Group();
+    scene.add(mapBlocksGroup);
+    rebuild3DMap(); // ПОСТРОЕНИЕ 3D КАРТЫ
+
+    weaponPivot = new THREE.Group(); camera.add(weaponPivot); create3DWeapons();
+}
+
+// ПЕРЕСТРОЙКА КАРТЫ НА ЛЕТУ ПРИ СМЕНЕ СЛОЖНОСТИ (АРЕНЫ BRAWL STARS)
+function rebuild3DMap() {
+    while(mapBlocksGroup.children.length > 0) {
+        mapBlocksGroup.remove(mapBlocksGroup.children[0]);
+    }
     const boxGeometryStandard = new THREE.BoxGeometry(1, 2, 1);
     const boxGeometryPlatform = new THREE.BoxGeometry(1, 1, 1);
-
     for (let z = 0; z < mapSize; z++) {
         for (let x = 0; x < mapSize; x++) {
             const cellVal = map[z * mapSize + x];
             if (cellVal > 0) {
-                let geom = boxGeometryStandard;
-                let hY = 1.0;
-                if (cellVal === 6) {
-                    geom = boxGeometryPlatform;
-                    hY = 0.5;
-                }
+                let geom = boxGeometryStandard; let hY = 1.0;
+                if (cellVal === 6) { geom = boxGeometryPlatform; hY = 0.5; }
                 const blockMat = new THREE.MeshLambertMaterial({ map: textures[cellVal] || textures[1] });
                 const block = new THREE.Mesh(geom, blockMat);
                 block.position.set(x + 0.5, hY, z + 0.5);
@@ -871,63 +745,32 @@ function init3D() {
             }
         }
     }
-    scene.add(mapBlocksGroup);
-
-    // Инициализация группы оружия, прикрепленной к камере
-    weaponPivot = new THREE.Group();
-    camera.add(weaponPivot);
-    create3DWeapons();
 }
 
 function create3DWeapons() {
-    // 1. ДРОБОВИК (Shotgun)
     const shotgunGroup = new THREE.Group();
-    // Деревянная рукоять
     const stock = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.15), new THREE.MeshLambertMaterial({ color: 0x4a2d18 }));
-    stock.position.set(0, -0.04, 0);
-    shotgunGroup.add(stock);
-    // Два стальных ствола
+    stock.position.set(0, -0.04, 0); shotgunGroup.add(stock);
     const barrelL = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.45), new THREE.MeshLambertMaterial({ color: 0x222222 }));
-    barrelL.position.set(-0.015, 0.01, -0.2);
-    shotgunGroup.add(barrelL);
-    const barrelR = barrelL.clone();
-    barrelR.position.x = 0.015;
-    shotgunGroup.add(barrelR);
-    
-    shotgunGroup.position.set(0.18, -0.22, -0.4);
-    weaponPivot.add(shotgunGroup);
-    weaponMeshes.shotgun = shotgunGroup;
+    barrelL.position.set(-0.015, 0.01, -0.2); shotgunGroup.add(barrelL);
+    const barrelR = barrelL.clone(); barrelR.position.x = 0.015; shotgunGroup.add(barrelR);
+    shotgunGroup.position.set(0.18, -0.22, -0.4); weaponPivot.add(shotgunGroup); weaponMeshes.shotgun = shotgunGroup;
 
-    // 2. АВТОМАТ (Rifle)
     const rifleGroup = new THREE.Group();
     const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.3), new THREE.MeshLambertMaterial({ color: 0x0d131a }));
     rifleGroup.add(receiver);
-    // Плазменный ствол с неоновым свечением
     const barrelRifle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.35), new THREE.MeshLambertMaterial({ color: 0x00bfff, emissive: 0x0033aa }));
-    barrelRifle.position.set(0, 0.01, -0.2);
-    rifleGroup.add(barrelRifle);
+    barrelRifle.position.set(0, 0.01, -0.2); rifleGroup.add(barrelRifle);
     const strip = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.2), new THREE.MeshBasicMaterial({ color: 0xe0ffff }));
-    strip.position.set(0, 0.035, -0.15);
-    rifleGroup.add(strip);
-    
-    rifleGroup.position.set(0.18, -0.22, -0.4);
-    rifleGroup.visible = false;
-    weaponPivot.add(rifleGroup);
-    weaponMeshes.rifle = rifleGroup;
+    strip.position.set(0, 0.035, -0.15); rifleGroup.add(strip);
+    rifleGroup.position.set(0.18, -0.22, -0.4); rifleGroup.visible = false; weaponPivot.add(rifleGroup); weaponMeshes.rifle = rifleGroup;
 
-    // 3. РАКЕТНИЦА (Rocket Launcher)
     const rocketGroup = new THREE.Group();
     const launcherBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.45), new THREE.MeshLambertMaterial({ color: 0x2d2d2d }));
     rocketGroup.add(launcherBody);
-    // Ракетное сопло с предупреждающей индикацией
     const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.05), new THREE.MeshLambertMaterial({ color: 0xff3300 }));
-    muzzle.position.set(0, 0, -0.225);
-    rocketGroup.add(muzzle);
-    
-    rocketGroup.position.set(0.22, -0.24, -0.4);
-    rocketGroup.visible = false;
-    weaponPivot.add(rocketGroup);
-    weaponMeshes.rocket = rocketGroup;
+    muzzle.position.set(0, 0, -0.225); rocketGroup.add(muzzle);
+    rocketGroup.position.set(0.22, -0.24, -0.4); rocketGroup.visible = false; weaponPivot.add(rocketGroup); weaponMeshes.rocket = rocketGroup;
 }
 
 function updateWeaponVisibility() {
@@ -939,401 +782,175 @@ function updateWeaponVisibility() {
 
 function create3DHealthBar(type) {
     const group = new THREE.Group();
-    
-    // Черный задний фон полоски
     const bgGeo = new THREE.PlaneGeometry(0.6, 0.06);
     const bgMat = new THREE.MeshBasicMaterial({ color: 0x111111, side: THREE.DoubleSide });
-    const bgMesh = new THREE.Mesh(bgGeo, bgMat);
-    group.add(bgMesh);
-    
-    // Цветная шкала здоровья
-    const fgGeo = new THREE.PlaneGeometry(0.6, 0.06);
-    // Сдвигаем опорную точку влево, чтобы шкала уменьшалась к левому краю
-    fgGeo.translate(0.3, 0, 0);
-    
+    group.add(new THREE.Mesh(bgGeo, bgMat));
+    const fgGeo = new THREE.PlaneGeometry(0.6, 0.06); fgGeo.translate(0.3, 0, 0);
     const fgColor = (type === 'boss') ? 0xff0033 : 0x00ff33;
     const fgMat = new THREE.MeshBasicMaterial({ color: fgColor, side: THREE.DoubleSide });
-    const fgMesh = new THREE.Mesh(fgGeo, fgMat);
-    // Смещаем шкалу на половину ширины влево и чуть-чуть вперед, чтобы избежать мерцания текстур (Z-fighting)
-    fgMesh.position.set(-0.3, 0, 0.002);
-    group.add(fgMesh);
-    
-    group.userData.fg = fgMesh;
-    return group;
+    const fgMesh = new THREE.Mesh(fgGeo, fgMat); fgMesh.position.set(-0.3, 0, 0.002);
+    group.add(fgMesh); group.userData.fg = fgMesh; return group;
 }
 
 function buildEnemyMesh(type) {
-    const group = new THREE.Group();
-    let animator = null;
-
+    const group = new THREE.Group(); let animator = null;
     if (type === 'boss') {
-        // БОСС (Светящийся гигантский страж)
         const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.8, 0.8), new THREE.MeshLambertMaterial({ color: 0x12131c }));
-        torso.position.y = 0.9;
-        group.add(torso);
-
+        torso.position.y = 0.9; group.add(torso);
         const innerCore = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.9), new THREE.MeshLambertMaterial({ color: 0x00fff2, emissive: 0x0088cc }));
-        innerCore.position.set(0, 1.0, 0.05);
-        group.add(innerCore);
-
+        innerCore.position.set(0, 1.0, 0.05); group.add(innerCore);
         const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.2, 0.3), new THREE.MeshLambertMaterial({ color: 0x0a0b12 }));
-        leftArm.position.set(-0.75, 0.8, 0);
-        group.add(leftArm);
-
-        const rightArm = leftArm.clone();
-        rightArm.position.x = 0.75;
-        group.add(rightArm);
-
-        animator = (time) => {
-            leftArm.rotation.x = Math.sin(time * 8) * 0.3;
-            rightArm.rotation.x = -Math.sin(time * 8) * 0.3;
-            innerCore.rotation.y = time * 2;
-        };
-
+        leftArm.position.set(-0.75, 0.8, 0); group.add(leftArm);
+        const rightArm = leftArm.clone(); rightArm.position.x = 0.75; group.add(rightArm);
+        animator = (time) => { leftArm.rotation.x = Math.sin(time * 8) * 0.3; rightArm.rotation.x = -Math.sin(time * 8) * 0.3; innerCore.rotation.y = time * 2; };
     } else if (type === 'creeper') {
-        // КРИПЕР
         const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), new THREE.MeshLambertMaterial({ color: 0x1b8a1b }));
-        head.position.y = 0.7;
-        group.add(head);
-
+        head.position.y = 0.7; group.add(head);
         const face = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.05), new THREE.MeshLambertMaterial({ color: 0x000000 }));
-        face.position.set(0, 0.7, 0.16);
-        group.add(face);
-
+        face.position.set(0, 0.7, 0.16); group.add(face);
         const torso = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, 0.2), new THREE.MeshLambertMaterial({ color: 0x0c4d0c }));
-        torso.position.y = 0.3;
-        group.add(torso);
-
-        const legGeom = new THREE.BoxGeometry(0.12, 0.16, 0.12);
-        const legMat = new THREE.MeshLambertMaterial({ color: 0x0a2e0a });
+        torso.position.y = 0.3; group.add(torso);
+        const legGeom = new THREE.BoxGeometry(0.12, 0.16, 0.12); const legMat = new THREE.MeshLambertMaterial({ color: 0x0a2e0a });
         const legFL = new THREE.Mesh(legGeom, legMat); legFL.position.set(-0.09, 0.08, 0.08); group.add(legFL);
         const legFR = new THREE.Mesh(legGeom, legMat); legFR.position.set(0.09, 0.08, 0.08); group.add(legFR);
         const legBL = new THREE.Mesh(legGeom, legMat); legBL.position.set(-0.09, 0.08, -0.08); group.add(legBL);
         const legBR = new THREE.Mesh(legGeom, legMat); legBR.position.set(0.09, 0.08, -0.08); group.add(legBR);
-
-        animator = (time) => {
-            const swing = Math.sin(time * 10) * 0.4;
-            legFL.rotation.x = swing;
-            legBR.rotation.x = swing;
-            legFR.rotation.x = -swing;
-            legBL.rotation.x = -swing;
-        };
-
+        animator = (time) => { const swing = Math.sin(time * 10) * 0.4; legFL.rotation.x = swing; legBR.rotation.x = swing; legFR.rotation.x = -swing; legBL.rotation.x = -swing; };
     } else if (type === 'skeleton') {
-        // СКЕЛЕТ-ВОИН
         const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.25), new THREE.MeshLambertMaterial({ color: 0x9f8db3 }));
-        head.position.y = 0.75;
-        group.add(head);
-
+        head.position.y = 0.75; group.add(head);
         const spine = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), new THREE.MeshLambertMaterial({ color: 0x2c2438 }));
-        spine.position.y = 0.38;
-        group.add(spine);
-
+        spine.position.y = 0.38; group.add(spine);
         const rib1 = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.04, 0.15), new THREE.MeshLambertMaterial({ color: 0x8a75a3 }));
-        rib1.position.set(0, 0.5, 0); group.add(rib1);
-        const rib2 = rib1.clone(); rib2.position.y = 0.4; group.add(rib2);
-
-        // Светящиеся синие глаза
+        rib1.position.set(0, 0.5, 0); group.add(rib1); const rib2 = rib1.clone(); rib2.position.y = 0.4; group.add(rib2);
         const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.02), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
-        eyeL.position.set(-0.06, 0.77, 0.125); group.add(eyeL);
-        const eyeR = eyeL.clone(); eyeR.position.x = 0.06; group.add(eyeR);
-
-        // Оружие в руках
+        eyeL.position.set(-0.06, 0.77, 0.125); group.add(eyeL); const eyeR = eyeL.clone(); eyeR.position.x = 0.06; group.add(eyeR);
         const blaster = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.25), new THREE.MeshLambertMaterial({ color: 0x4c3a5c }));
-        blaster.position.set(0.16, 0.4, 0.1);
-        group.add(blaster);
-
-        animator = (time) => {
-            blaster.position.y = 0.4 + Math.sin(time * 6) * 0.02;
-        };
-
+        blaster.position.set(0.16, 0.4, 0.1); group.add(blaster);
+        animator = (time) => { blaster.position.y = 0.4 + Math.sin(time * 6) * 0.02; };
     } else if (type === 'flyer') {
-        // ПРИЗРАЧНЫЙ ЛЕТУН
         const body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.35), new THREE.MeshLambertMaterial({ color: 0x5c6e62 }));
-        body.position.y = 0.5;
-        group.add(body);
-
+        body.position.y = 0.5; group.add(body);
         const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.2), new THREE.MeshLambertMaterial({ color: 0x4a5850 }));
-        wingL.position.set(-0.3, 0.5, 0);
-        group.add(wingL);
-
-        const wingR = wingL.clone();
-        wingR.position.x = 0.3;
-        group.add(wingR);
-
-        animator = (time) => {
-            const wingFlap = Math.sin(time * 12) * 0.6;
-            wingL.rotation.z = wingFlap;
-            wingR.rotation.z = -wingFlap;
-        };
+        wingL.position.set(-0.3, 0.5, 0); group.add(wingL); const wingR = wingL.clone(); wingR.position.x = 0.3; group.add(wingR);
+        animator = (time) => { const wingFlap = Math.sin(time * 12) * 0.6; wingL.rotation.z = wingFlap; wingR.rotation.z = -wingFlap; };
     }
-
-    // Создаем трехмерную полоску здоровья и прикрепляем её к группе монстра
     const healthBar = create3DHealthBar(type);
-    // Позиционируем над головой в зависимости от типа врага
     healthBar.position.y = (type === 'boss') ? 2.2 : (type === 'flyer' ? 1.0 : 1.1);
-    group.add(healthBar);
-    group.userData.healthBar = healthBar;
-
+    group.add(healthBar); group.userData.healthBar = healthBar;
     return { mesh: group, animator: animator };
 }
 
 function buildPickupMesh(type) {
     const group = new THREE.Group();
     if (type === 'health') {
-        // Аптечка (белый куб с красным крестом)
-        const box = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshLambertMaterial({ color: 0xffffff }));
-        group.add(box);
-        const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.04, 0.21), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-        group.add(crossH);
-        const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.14, 0.21), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-        group.add(crossV);
+        group.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshLambertMaterial({ color: 0xffffff })));
+        group.add(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.04, 0.21), new THREE.MeshBasicMaterial({ color: 0xff0000 })));
+        group.add(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.14, 0.21), new THREE.MeshBasicMaterial({ color: 0xff0000 })));
     } else {
-        // Боеприпасы (ящик золотых пуль)
-        const crate = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.18, 0.2), new THREE.MeshLambertMaterial({ color: 0x8b5a2b }));
-        group.add(crate);
+        group.add(new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.18, 0.2), new THREE.MeshLambertMaterial({ color: 0x8b5a2b })));
         const bullets = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 0.22), new THREE.MeshBasicMaterial({ color: 0xffd700 }));
-        bullets.position.y = 0.08;
-        group.add(bullets);
+        bullets.position.y = 0.08; group.add(bullets);
     }
     return group;
 }
 
-function buildProjectileMesh() {
-    // Ракета (желто-оранжевая раскаленная сфера)
-    const geom = new THREE.SphereGeometry(0.12, 8, 8);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
-    return new THREE.Mesh(geom, mat);
-}
-
-function buildParticleMesh(color) {
-    // Взрывной пиксельный кубик
-    const geom = new THREE.BoxGeometry(0.08, 0.08, 0.08);
-    const mat = new THREE.MeshBasicMaterial({ color: color || 0xff9900 });
-    return new THREE.Mesh(geom, mat);
-}
-
+function buildProjectileMesh() { return new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffcc00 })); }
+function buildParticleMesh(color) { return new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), new THREE.MeshBasicMaterial({ color: color || 0xff9900 })); }
 function buildNetPlayerMesh(colorHex) {
-    // Персонаж союзника
     const group = new THREE.Group();
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.6, 0.2), new THREE.MeshLambertMaterial({ color: colorHex || 0x00ffcc }));
-    body.position.y = 0.3;
-    group.add(body);
+    body.position.y = 0.3; group.add(body);
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshLambertMaterial({ color: 0xf0d0a8 }));
-    head.position.y = 0.7;
-    group.add(head);
-    return group;
+    head.position.y = 0.7; group.add(head); return group;
 }
 
 function syncEntitiesWith3DScene() {
-    const activeMeshIds = new Set();
-    const time = performance.now() / 1000;
-
-    // 1. СИНХРОНИЗАЦИЯ ВРАГОВ
+    const activeMeshIds = new Set(); const time = performance.now() / 1000;
     enemies.forEach(enemy => {
-        if (!enemy._meshId) {
-            enemy._meshId = 'enemy_' + Math.random().toString(36).substr(2, 9);
-        }
+        if (!enemy._meshId) enemy._meshId = 'enemy_' + Math.random().toString(36).substr(2, 9);
         activeMeshIds.add(enemy._meshId);
-
         let entityData = entityMeshes.get(enemy._meshId);
         if (!entityData) {
-            const compiled = buildEnemyMesh(enemy.type);
-            scene.add(compiled.mesh);
-            entityData = { mesh: compiled.mesh, animator: compiled.animator };
-            entityMeshes.set(enemy._meshId, entityData);
+            const compiled = buildEnemyMesh(enemy.type); scene.add(compiled.mesh);
+            entityData = { mesh: compiled.mesh, animator: compiled.animator }; entityMeshes.set(enemy._meshId, entityData);
         }
-
-        // Позиционируем в 3D пространстве
         entityData.mesh.position.set(enemy.x, enemy.z || 0.0, enemy.y);
-        
-        // Разворачиваем монстра лицом к игроку (billboard-стиль вращения вокруг оси Y)
-        const angleToPlayer = Math.atan2(playerX - enemy.x, playerY - enemy.y);
-        entityData.mesh.rotation.y = angleToPlayer;
-
-        // Обновляем шкалу 3D-здоровья над головой врага
+        entityData.mesh.rotation.y = Math.atan2(playerX - enemy.x, playerY - enemy.y);
         if (entityData.mesh.userData.healthBar) {
-            const healthBar = entityData.mesh.userData.healthBar;
-            const fg = healthBar.userData.fg;
-            const ratio = Math.max(0, Math.min(1, enemy.health / enemy.maxHealth));
-            
-            // Масштабируем полоску в соответствии со здоровьем
-            fg.scale.x = ratio;
-            
-            // Направляем полоску здоровья всегда ровно на камеру игрока (эффект биллборда)
+            const healthBar = entityData.mesh.userData.healthBar; const fg = healthBar.userData.fg;
+            fg.scale.x = Math.max(0, Math.min(1, enemy.health / enemy.maxHealth));
             healthBar.quaternion.copy(camera.quaternion);
         }
-
-        // Запуск локальных скелетных анимаций
-        if (entityData.animator) {
-            entityData.animator(time);
-        }
+        if (entityData.animator) entityData.animator(time);
     });
 
-    // 2. СИНХРОНИЗАЦИЯ СНАРЯДОВ (РАКЕТ)
     projectiles.forEach(proj => {
-        if (!proj._meshId) {
-            proj._meshId = 'proj_' + Math.random().toString(36).substr(2, 9);
-        }
+        if (!proj._meshId) proj._meshId = 'proj_' + Math.random().toString(36).substr(2, 9);
         activeMeshIds.add(proj._meshId);
-
         let mesh = entityMeshes.get(proj._meshId);
-        if (!mesh) {
-            mesh = buildProjectileMesh();
-            scene.add(mesh);
-            entityMeshes.set(proj._meshId, mesh);
-        }
+        if (!mesh) { mesh = buildProjectileMesh(); scene.add(mesh); entityMeshes.set(proj._meshId, mesh); }
         mesh.position.set(proj.x, proj.z, proj.y);
     });
 
-    // 3. СИНХРОНИЗАЦИЯ ПИКАПОВ
     pickups.forEach(pickup => {
-        if (!pickup._meshId) {
-            pickup._meshId = 'pickup_' + Math.random().toString(36).substr(2, 9);
-        }
+        if (!pickup._meshId) pickup._meshId = 'pickup_' + Math.random().toString(36).substr(2, 9);
         activeMeshIds.add(pickup._meshId);
-
         let mesh = entityMeshes.get(pickup._meshId);
-        if (!mesh) {
-            mesh = buildPickupMesh(pickup.type);
-            scene.add(mesh);
-            entityMeshes.set(pickup._meshId, mesh);
-        }
-        const bounceY = 0.15 + Math.sin(pickup.bounceTimer) * 0.05;
-        mesh.position.set(pickup.x, bounceY, pickup.y);
-        mesh.rotation.y = time * 1.5; // Вращаем
-        pickup.bounceTimer += 0.04;
+        if (!mesh) { mesh = buildPickupMesh(pickup.type); scene.add(mesh); entityMeshes.set(pickup._meshId, mesh); }
+        mesh.position.set(pickup.x, 0.15 + Math.sin(pickup.bounceTimer) * 0.05, pickup.y);
+        mesh.rotation.y = time * 1.5; pickup.bounceTimer += 0.04;
     });
 
-    // 4. СИНХРОНИЗАЦИЯ ЧАСТИЦ
     particles.forEach(part => {
-        if (!part._meshId) {
-            part._meshId = 'part_' + Math.random().toString(36).substr(2, 9);
-        }
+        if (!part._meshId) part._meshId = 'part_' + Math.random().toString(36).substr(2, 9);
         activeMeshIds.add(part._meshId);
-
         let mesh = entityMeshes.get(part._meshId);
-        if (!mesh) {
-            mesh = buildParticleMesh(part.color);
-            scene.add(mesh);
-            entityMeshes.set(part._meshId, mesh);
-        }
+        if (!mesh) { mesh = buildParticleMesh(part.color); scene.add(mesh); entityMeshes.set(part._meshId, mesh); }
         mesh.position.set(part.x, part.z, part.y);
     });
 
-    // 5. МУЛЬТИПЛЕЕРНЫЕ СОЮЗНИКИ
     if (multiplayer.enabled) {
         Object.values(multiplayer.players).forEach(op => {
             if (op.id === multiplayer.myId || !op.alive) return;
-            const netPlayerId = 'net_' + op.id;
-            activeMeshIds.add(netPlayerId);
-
+            const netPlayerId = 'net_' + op.id; activeMeshIds.add(netPlayerId);
             let mesh = entityMeshes.get(netPlayerId);
-            if (!mesh) {
-                mesh = buildNetPlayerMesh(op.color);
-                scene.add(mesh);
-                entityMeshes.set(netPlayerId, mesh);
-            }
-            mesh.position.set(op.x, 0.0, op.y);
-            mesh.rotation.y = -op.angle - Math.PI / 2;
+            if (!mesh) { mesh = buildNetPlayerMesh(op.color); scene.add(mesh); entityMeshes.set(netPlayerId, mesh); }
+            mesh.position.set(op.x, 0.0, op.y); mesh.rotation.y = -op.angle - Math.PI / 2;
         });
     }
 
-    // 6. ОЧИСТКА УДАЛЕННЫХ ИЗ ЛОГИКИ СУЩНОСТЕЙ ИЗ 3D-СЦЕНЫ
     for (let [id, val] of entityMeshes.entries()) {
-        if (!activeMeshIds.has(id)) {
-            const targetMesh = val.mesh ? val.mesh : val;
-            scene.remove(targetMesh);
-            entityMeshes.delete(id);
-        }
+        if (!activeMeshIds.has(id)) { scene.remove(val.mesh ? val.mesh : val); entityMeshes.delete(id); }
     }
 }
 
 function connectMultiplayer(serverUrl, roomCode, playerName, chosenDifficulty, onReady, onError) {
-    let ws;
-    try {
-        ws = new WebSocket(serverUrl);
-    } catch (e) {
-        onError('Не удалось создать подключение: ' + e.message);
-        return;
-    }
-
-    const connectTimeout = setTimeout(() => {
-        onError('Сервер не отвечает. Проверьте адрес и попробуйте снова.');
-        try { ws.close(); } catch (e) {}
-    }, 8000);
-
-    ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'join', room: roomCode || 'default', name: playerName || 'Игрок', difficulty: chosenDifficulty }));
-    };
-
+    let ws; try { ws = new WebSocket(serverUrl); } catch (e) { onError('Ошибка СОЕДИНЕНИЯ: ' + e.message); return; }
+    const connectTimeout = setTimeout(() => { onError('Сервер не отвечает.'); try { ws.close(); } catch (e) {} }, 8000);
+    ws.onopen = () => { ws.send(JSON.stringify({ type: 'join', room: roomCode || 'default', name: playerName || 'Игрок', difficulty: chosenDifficulty })); };
     ws.onmessage = (event) => {
-        let msg;
-        try { msg = JSON.parse(event.data); } catch (e) { return; }
-
+        let msg; try { msg = JSON.parse(event.data); } catch (e) { return; }
         if (msg.type === 'joined') {
-            clearTimeout(connectTimeout);
-            multiplayer.myId = msg.id;
-            multiplayer.enabled = true;
-            multiplayer.ws = ws;
-            difficulty = msg.difficulty;
-            onReady(msg.x, msg.y);
+            clearTimeout(connectTimeout); multiplayer.myId = msg.id; multiplayer.enabled = true; multiplayer.ws = ws;
+            difficulty = msg.difficulty; map = MAPS[difficulty].slice(); rebuild3DMap(); onReady(msg.x, msg.y);
         } else if (msg.type === 'state') {
-            const newEnemies = msg.enemies.map(e => ({
-                id: e.id, type: e.type, x: e.x, y: e.y, z: e.z || 0,
-                health: e.hp, maxHealth: e.maxHp, size: e.type === 'boss' ? 1.3 : 0.45,
-                isFlying: e.isFlying
-            }));
-            enemies = newEnemies;
-
-            multiplayer.players = {};
-            let me = null;
-            msg.players.forEach(p => {
-                multiplayer.players[p.id] = p;
-                if (p.id === multiplayer.myId) me = p;
-            });
-
+            enemies = msg.enemies.map(e => ({ id: e.id, type: e.type, x: e.x, y: e.y, z: e.z || 0, health: e.hp, maxHealth: e.maxHp, size: e.type === 'boss' ? 1.3 : 0.45, isFlying: e.isFlying }));
+            multiplayer.players = {}; let me = null;
+            msg.players.forEach(p => { multiplayer.players[p.id] = p; if (p.id === multiplayer.myId) me = p; });
             const bossEntry = msg.enemies.find(e => e.type === 'boss');
-            if (bossEntry) {
-                hasBoss = true;
-                bossUi.style.display = 'block';
-                bossHpUi.innerText = Math.max(0, Math.floor(bossEntry.hp));
-            } else {
-                hasBoss = false;
-                bossUi.style.display = 'none';
-            }
-
+            if (bossEntry) { hasBoss = true; bossUi.style.display = 'block'; bossHpUi.innerText = Math.max(0, Math.floor(bossEntry.hp)); } else { hasBoss = false; bossUi.style.display = 'none'; }
             if (me) {
-                health = Math.max(0, Math.floor(me.health));
-                healthUi.innerText = health;
-                score = me.score;
-                scoreUi.innerText = score;
+                health = Math.max(0, Math.floor(me.health)); healthUi.innerText = health; score = me.score; scoreUi.innerText = score;
                 if (!me.alive && gameState === 'PLAYING') {
-                    gameState = 'GAMEOVER';
-                    document.getElementById("death-stats").innerHTML = `Ваш финальный счет: <span style="color:yellow; font-size:24px;">${score}</span> очков!`;
-                    document.getElementById("death-overlay").style.display = 'flex';
-                    document.exitPointerLock();
+                    gameState = 'GAMEOVER'; document.getElementById("death-stats").innerHTML = `Счет: <span style="color:yellow; font-size:24px;">${score}</span>!`;
+                    document.getElementById("death-overlay").style.display = 'flex'; document.exitPointerLock();
                 }
             }
-        } else if (msg.type === 'enemyDied') {
-            spawnPickup(msg.x, msg.y);
-        } else if (msg.type === 'playerLeft') {
-            delete multiplayer.players[msg.id];
-        }
+        } else if (msg.type === 'enemyDied') { spawnPickup(msg.x, msg.y); } else if (msg.type === 'playerLeft') { delete multiplayer.players[msg.id]; }
     };
-
-    ws.onerror = () => {
-        clearTimeout(connectTimeout);
-        onError('Ошибка подключения к серверу.');
-    };
-
-    ws.onclose = () => {
-        clearTimeout(connectTimeout);
-        if (multiplayer.enabled) {
-            multiplayer.enabled = false;
-            showCenterMessage('Соединение с сервером потеряно');
-        }
-    };
+    ws.onerror = () => { clearTimeout(connectTimeout); onError('Ошибка подключения к серверу.'); };
+    ws.onclose = () => { clearTimeout(connectTimeout); if (multiplayer.enabled) { multiplayer.enabled = false; showCenterMessage('Соединение потеряно'); } };
 }
 
 function sendNetworkHit(enemyId, damage) {
@@ -1344,524 +961,243 @@ function sendNetworkHit(enemyId, damage) {
 
 function toggleShop() {
     if (gameState === 'START' || gameState === 'GAMEOVER') return;
-    if (multiplayer.enabled) {
-        showCenterMessage('Магазин недоступен в совместном режиме');
-        return;
-    }
-    
+    if (multiplayer.enabled) { showCenterMessage('Магазин недоступен в сети'); return; }
     if (gameState === 'PLAYING') {
-        gameState = 'SHOP';
-        document.exitPointerLock();
-        updateShopUI();
+        gameState = 'SHOP'; document.exitPointerLock(); updateShopUI();
         document.getElementById("shop-overlay").style.display = "flex";
     } else if (gameState === 'SHOP') {
-        gameState = 'PLAYING';
-        document.getElementById("shop-overlay").style.display = "none";
+        gameState = 'PLAYING'; document.getElementById("shop-overlay").style.display = "none";
         canvas.requestPointerLock();
     }
 }
 
 function updateShopUI() {
     document.getElementById("shop-score").innerText = `ВАШ СЧЕТ (ВАЛЮТА): ${score}`;
-    
-    document.getElementById("desc-health").innerText = `Текущий максимум: ${maxHealth} HP. Здоровье увеличится до ${maxHealth + 25} HP.`;
-    document.getElementById("cost-health").innerText = shopCosts.health;
-    document.getElementById("btn-buy-health").disabled = score < shopCosts.health;
-    
-    let currentPct = Math.round((damageMultiplier - 1.0) * 100);
-    document.getElementById("desc-damage").innerText = `Текущий урон: +${currentPct}%. Сила всех пушек увеличится еще на +15%.`;
-    document.getElementById("cost-damage").innerText = shopCosts.damage;
-    document.getElementById("btn-buy-damage").disabled = score < shopCosts.damage;
-    
+    document.getElementById("desc-health").innerText = `Текущий максимум: ${maxHealth} HP. Увеличится до ${maxHealth + 25} HP.`;
+    document.getElementById("cost-health").innerText = shopCosts.health; document.getElementById("btn-buy-health").disabled = score < shopCosts.health;
+    document.getElementById("desc-damage").innerText = `Текущий урон: +${Math.round((damageMultiplier - 1.0) * 100)}%. Увеличится еще на +15%.`;
+    document.getElementById("cost-damage").innerText = shopCosts.damage; document.getElementById("btn-buy-damage").disabled = score < shopCosts.damage;
     const rBtn = document.getElementById("btn-buy-rifle");
-    if (weaponsUnlocked.rifle) {
-        rBtn.innerText = "КУПЛЕНО";
-        rBtn.disabled = true;
-    } else {
-        rBtn.innerHTML = `Разблокировать [2] <br> <span>${shopCosts.rifle}</span> очков`;
-        rBtn.disabled = score < shopCosts.rifle;
-    }
-    
+    if (weaponsUnlocked.rifle) { rBtn.innerText = "КУПЛЕНО"; rBtn.disabled = true; } else { rBtn.innerHTML = `Разблокировать [2] <br> <span>${shopCosts.rifle}</span> очков`; rBtn.disabled = score < shopCosts.rifle; }
     const rkBtn = document.getElementById("btn-buy-rocket");
-    if (weaponsUnlocked.rocket) {
-        rkBtn.innerText = "КУПЛЕНО";
-        rkBtn.disabled = true;
-    } else {
-        rkBtn.innerHTML = `Разблокировать [3] <br> <span>${shopCosts.rocket}</span> очков`;
-        rkBtn.disabled = score < shopCosts.rocket;
-    }
-
-    document.getElementById("cost-ammo").innerText = shopCosts.ammo;
-    document.getElementById("btn-buy-ammo").disabled = score < shopCosts.ammo;
+    if (weaponsUnlocked.rocket) { rkBtn.innerText = "КУПЛЕНО"; rkBtn.disabled = true; } else { rkBtn.innerHTML = `Разблокировать [3] <br> <span>${shopCosts.rocket}</span> очков`; rkBtn.disabled = score < shopCosts.rocket; }
+    document.getElementById("cost-ammo").innerText = shopCosts.ammo; document.getElementById("btn-buy-ammo").disabled = score < shopCosts.ammo;
 }
 
 function buyUpgrade(type) {
     if (score < shopCosts[type]) return;
-    
-    initAudio();
-    playPickupSound();
-    
+    initAudio(); playPickupSound();
     if (type === 'health') {
-        score -= shopCosts.health;
-        maxHealth += 25;
-        health += 25; 
-        if (health > maxHealth) health = maxHealth;
-        shopCosts.health = Math.floor(shopCosts.health * 1.5);
-        showCenterMessage("Успешно куплено: +25 Макс. Здоровья!");
+        score -= shopCosts.health; maxHealth += 25; health += 25; if (health > maxHealth) health = maxHealth;
+        shopCosts.health = Math.floor(shopCosts.health * 1.5); showCenterMessage("Куплено: +25 Макс. Здоровья!");
     } else if (type === 'damage') {
-        score -= shopCosts.damage;
-        damageMultiplier += 0.15;
-        shopCosts.damage = Math.floor(shopCosts.damage * 1.6);
-        showCenterMessage("Успешно куплено: +15% к Силе Атаки!");
+        score -= shopCosts.damage; damageMultiplier += 0.15; shopCosts.damage = Math.floor(shopCosts.damage * 1.6); showCenterMessage("Куплено: +15% к Силе Атаки!");
     } else if (type === 'rifle') {
-        score -= shopCosts.rifle;
-        weaponsUnlocked.rifle = true;
-        showCenterMessage("Разблокирован: Плазменный автомат [2]!");
+        score -= shopCosts.rifle; weaponsUnlocked.rifle = true; showCenterMessage("Разблокирован: Автомат [2]!");
     } else if (type === 'rocket') {
-        score -= shopCosts.rocket;
-        weaponsUnlocked.rocket = true;
-        showCenterMessage("Разблокирована: Тяжелая ракетница [3]!");
+        score -= shopCosts.rocket; weaponsUnlocked.rocket = true; showCenterMessage("Разблокирована: Ракетница [3]!");
     } else if (type === 'ammo') {
-        score -= shopCosts.ammo;
-        ammo = Math.min(200, ammo + 50);
-        showCenterMessage("Получена поставка боеприпасов (+50)!");
+        score -= shopCosts.ammo; ammo = Math.min(200, ammo + 50); showCenterMessage("Получены боеприпасы (+50)!");
     }
-    
-    scoreUi.innerText = score;
-    healthUi.innerText = health;
-    ammoUi.innerText = ammo;
-    
-    updateShopUI();
+    scoreUi.innerText = score; healthUi.innerText = health; ammoUi.innerText = ammo; updateShopUI();
 }
 
 function spawnBlood(x, y, count = 6) {
     for (let i = 0; i < count; i++) {
-        particles.push({
-            x: x + (Math.random() - 0.5) * 0.2,
-            y: y + (Math.random() - 0.5) * 0.2,
-            z: 0.1 + Math.random() * 0.4,
-            vx: (Math.random() - 0.5) * 2,
-            vy: (Math.random() - 0.5) * 2,
-            vz: 1 + Math.random() * 3,
-            color: 0x990000,
-            size: 3 + Math.random() * 4,
-            life: 1.0,
-            type: 'blood'
-        });
+        particles.push({ x: x + (Math.random() - 0.5) * 0.2, y: y + (Math.random() - 0.5) * 0.2, z: 0.1 + Math.random() * 0.4, vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2, vz: 1 + Math.random() * 3, color: 0x990000, size: 3 + Math.random() * 4, life: 1.0, type: 'blood' });
     }
 }
 
 function spawnExplosion(x, y, z = 0) {
     playExplosionSound();
     for (let i = 0; i < 20; i++) {
-        particles.push({
-            x: x,
-            y: y,
-            z: z + (Math.random() - 0.5) * 0.3,
-            vx: (Math.random() - 0.5) * 5,
-            vy: (Math.random() - 0.5) * 5,
-            vz: Math.random() * 4 - 1,
-            color: Math.random() > 0.4 ? 0xff6600 : 0xffcc00,
-            size: 8 + Math.random() * 10,
-            life: 0.8 + Math.random() * 0.4,
-            type: 'fire'
-        });
+        particles.push({ x: x, y: y, z: z + (Math.random() - 0.5) * 0.3, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, vz: Math.random() * 4 - 1, color: Math.random() > 0.4 ? 0xff6600 : 0xffcc00, size: 8 + Math.random() * 10, life: 0.8 + Math.random() * 0.4, type: 'fire' });
     }
 }
 
 function spawnEnemy(isBoss = false) {
-    const settings = DIFFICULTY_SETTINGS[difficulty];
-    let spawned = false;
-    let attempts = 0;
+    const settings = DIFFICULTY_SETTINGS[difficulty]; let spawned = false; let attempts = 0;
     while (!spawned && attempts < 150) {
-        attempts++;
-        let rx = Math.floor(Math.random() * mapSize);
-        let ry = Math.floor(Math.random() * mapSize);
-        
+        attempts++; let rx = Math.floor(Math.random() * mapSize); let ry = Math.floor(Math.random() * mapSize);
         if (map[ry * mapSize + rx] === 0 && Math.hypot(rx - playerX, ry - playerY) > 6) {
             if (isBoss) {
                 const bossHp = settings.bossHp;
-                enemies.push({
-                    x: rx + 0.5, y: ry + 0.5, z: 0,
-                    type: 'boss', health: bossHp, maxHealth: bossHp, speed: 2.1, size: 1.3,
-                    isFlying: settings.flyingBoss, hoverPhase: Math.random() * Math.PI * 2
-                });
-                hasBoss = true;
-                bossUi.style.display = "block";
-                bossHpUi.innerText = bossHp;
+                enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: 'boss', health: bossHp, maxHealth: bossHp, speed: 2.1, size: 1.3, isFlying: settings.flyingBoss, hoverPhase: Math.random() * Math.PI * 2 });
+                hasBoss = true; bossUi.style.display = "block"; bossHpUi.innerText = bossHp;
             } else {
                 let type;
-                if (settings.flyingEnemies) {
-                    const r = Math.random();
-                    type = r < 0.34 ? 'creeper' : (r < 0.67 ? 'skeleton' : 'flyer');
-                } else {
-                    type = Math.random() > 0.5 ? 'creeper' : 'skeleton';
-                }
-
-                if (type === 'creeper') {
-                    enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: settings.creeperHp, maxHealth: settings.creeperHp, speed: 1.6, size: 0.45 });
-                } else if (type === 'skeleton') {
-                    enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: settings.skeletonHp, maxHealth: settings.skeletonHp, speed: 1.2, size: 0.45 });
-                } else {
-                    enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0.9, type: type, health: settings.flyerHp, maxHealth: settings.flyerHp, speed: 2.0, size: 0.4, isFlying: true, hoverPhase: Math.random() * Math.PI * 2 });
-                }
+                if (settings.flyingEnemies) { const r = Math.random(); type = r < 0.34 ? 'creeper' : (r < 0.67 ? 'skeleton' : 'flyer'); } else { type = Math.random() > 0.5 ? 'creeper' : 'skeleton'; }
+                if (type === 'creeper') { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: settings.creeperHp, maxHealth: settings.creeperHp, speed: 1.6, size: 0.45 }); }
+                else if (type === 'skeleton') { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: settings.skeletonHp, maxHealth: settings.skeletonHp, speed: 1.2, size: 0.45 }); }
+                else { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0.9, type: type, health: settings.flyerHp, maxHealth: settings.flyerHp, speed: 2.0, size: 0.4, isFlying: true, hoverPhase: Math.random() * Math.PI * 2 }); }
             }
             spawned = true;
         }
     }
 }
 
-function spawnPickup(x, y) {
-    let type = Math.random() > 0.4 ? 'ammo' : 'health';
-    pickups.push({
-        x: x,
-        y: y,
-        type: type,
-        bounceTimer: Math.random() * 10
-    });
-}
-
-function toggleMpPanel() {
-    const panel = document.getElementById("mp-panel");
-    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-}
+function spawnPickup(x, y) { pickups.push({ x: x, y: y, type: Math.random() > 0.4 ? 'ammo' : 'health', bounceTimer: Math.random() * 10 }); }
+function toggleMpPanel() { const panel = document.getElementById("mp-panel"); panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; }
 
 function attemptMultiplayerConnect() {
-    const url = document.getElementById("mp-url").value.trim();
-    const room = document.getElementById("mp-room").value.trim();
-    const name = document.getElementById("mp-name").value.trim();
-    const chosenDifficulty = document.getElementById("mp-difficulty").value;
+    const url = document.getElementById("mp-url").value.trim(); const room = document.getElementById("mp-room").value.trim();
+    const name = document.getElementById("mp-name").value.trim(); const chosenDifficulty = document.getElementById("mp-difficulty").value;
     const statusEl = document.getElementById("mp-status");
-
-    if (!url) {
-        statusEl.style.color = '#ff8080';
-        statusEl.innerText = 'Укажите адрес сервера.';
-        return;
-    }
-
-    statusEl.style.color = '#ffd23a';
-    statusEl.innerText = 'Подключение...';
-
+    if (!url) { statusEl.style.color = '#ff8080'; statusEl.innerText = 'Укажите адрес сервера.'; return; }
+    statusEl.style.color = '#ffd23a'; statusEl.innerText = 'Подключение...';
     connectMultiplayer(url, room, name, chosenDifficulty,
         (spawnX, spawnY) => {
-            statusEl.innerText = '';
-            playerX = spawnX;
-            playerY = spawnY;
-            playerAngle = 0.0;
-            playerPitch = 0.0;
-            playerZ = 0;
-            playerVelZ = 0;
-            isOnGround = true;
-            health = 100;
-            maxHealth = 100;
-            score = 0;
-            ammo = 100;
-            rifleClip = 30;
-            currentWeapon = 'shotgun';
-            rocketLoaded = true;
-            weaponsUnlocked = { shotgun: true, rifle: false, rocket: false };
-            enemies = [];
-            projectiles = [];
-            particles = [];
-            pickups = [];
-            damageIndicators = [];
-            healthUi.innerText = health;
-            scoreUi.innerText = score;
-            ammoUi.innerText = ammo;
-            weaponUi.innerText = "ДРОБОВИК [1]";
-            updateWeaponVisibility();
-            initAudio();
-            document.getElementById("start-overlay").style.display = 'none';
-            gameState = 'PLAYING';
-            startBackgroundMusic();
-            updateDifficultyUi();
-            canvas.requestPointerLock();
+            statusEl.innerText = ''; playerX = spawnX; playerY = spawnY; playerAngle = 0.0; playerPitch = 0.0;
+            playerZ = 0; playerVelZ = 0; isOnGround = true; health = 100; maxHealth = 100; score = 0; ammo = 100; shotgunClip = 2; rifleClip = 30;
+            currentWeapon = 'shotgun'; rocketLoaded = true; weaponsUnlocked = { shotgun: true, rifle: false, rocket: false };
+            enemies = []; projectiles = []; particles = []; pickups = [];
+            healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)";
+            updateWeaponVisibility(); initAudio(); document.getElementById("start-overlay").style.display = 'none';
+            gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
         },
-        (errorMsg) => {
-            statusEl.style.color = '#ff8080';
-            statusEl.innerText = errorMsg;
-        }
+        (errorMsg) => { statusEl.style.color = '#ff8080'; statusEl.innerText = errorMsg; }
     );
 }
 
 function startGame(chosenDifficulty) {
     multiplayer.enabled = false;
     if (multiplayer.ws) { try { multiplayer.ws.close(); } catch (e) {} multiplayer.ws = null; }
-    if (chosenDifficulty) difficulty = chosenDifficulty;
-    initAudio();
-    document.getElementById("start-overlay").style.display = 'none';
-    gameState = 'PLAYING';
-    startBackgroundMusic();
-    updateDifficultyUi();
-    canvas.requestPointerLock();
+    if (chosenDifficulty) {
+        difficulty = chosenDifficulty;
+        map = MAPS[difficulty].slice();
+        if (mapBlocksGroup) rebuild3DMap();
+    }
+    initAudio(); document.getElementById("start-overlay").style.display = 'none';
+    gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
 }
 
 function updateDifficultyUi() {
-    const label = DIFFICULTY_SETTINGS[difficulty].label;
-    const el = document.getElementById("difficulty-val");
+    const label = DIFFICULTY_SETTINGS[difficulty].label; const el = document.getElementById("difficulty-val");
     if (el) el.innerText = label + (multiplayer.enabled ? ' (СЕТЬ)' : '');
 }
 
 function restartGame() {
     if (multiplayer.enabled) {
-        if (multiplayer.ws && multiplayer.ws.readyState === WebSocket.OPEN) {
-            multiplayer.ws.send(JSON.stringify({ type: 'respawn' }));
-        }
-        playerZ = 0;
-        playerVelZ = 0;
-        isOnGround = true;
-        ammo = 100;
-        rifleClip = 30;
-        isReloading = false;
-        reloadTimer = 0;
-        projectiles = [];
-        particles = [];
-        damageIndicators = [];
-        document.getElementById("death-overlay").style.display = 'none';
-        document.getElementById("shop-overlay").style.display = 'none';
-        ammoUi.innerText = ammo;
-        weaponUi.innerText = "ДРОБОВИК [1]";
-        reloadUi.innerText = "";
-        gameState = 'PLAYING';
-        canvas.requestPointerLock();
+        if (multiplayer.ws && multiplayer.ws.readyState === WebSocket.OPEN) multiplayer.ws.send(JSON.stringify({ type: 'respawn' }));
+        playerZ = 0; playerVelZ = 0; isOnGround = true; ammo = 100; shotgunClip = 2; rifleClip = 30; isReloading = false; reloadTimer = 0;
+        projectiles = []; particles = []; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
+        ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)"; reloadUi.innerText = ""; gameState = 'PLAYING'; canvas.requestPointerLock();
         return;
     }
-
-    playerX = 3.5;
-    playerY = 3.5;
-    playerAngle = 0.0;
-    playerPitch = 0.0;
-    playerZ = 0;
-    playerVelZ = 0;
-    isOnGround = true;
-    
-    health = 100;
-    maxHealth = 100;
-    damageMultiplier = 1.0;
-    score = 0;
-    ammo = 100;
-    rifleClip = 30;
-    currentWeapon = 'shotgun';
-    rocketLoaded = true;
-    hasBoss = false;
-    isReloading = false;
-    reloadTimer = 0;
-    
-    weaponsUnlocked = { shotgun: true, rifle: false, rocket: false };
-    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, ammo: 150 };
-    
-    enemies = [];
-    projectiles = [];
-    particles = [];
-    pickups = [];
-    damageIndicators = [];
-
-    bossUi.style.display = "none";
-    document.getElementById("death-overlay").style.display = 'none';
-    document.getElementById("shop-overlay").style.display = 'none';
-    
+    playerX = 3.5; playerY = 3.5; playerAngle = 0.0; playerPitch = 0.0; playerZ = 0; playerVelZ = 0; isOnGround = true;
+    health = 100; maxHealth = 100; damageMultiplier = 1.0; score = 0; ammo = 100; shotgunClip = 2; rifleClip = 30;
+    currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadTimer = 0;
+    weaponsUnlocked = { shotgun: true, rifle: false, rocket: false }; shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, ammo: 150 };
+    enemies = []; projectiles = []; particles = []; pickups = [];
+    bossUi.style.display = "none"; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
     for(let i = 0; i < 7; i++) spawnEnemy(false);
-
-    healthUi.innerText = health;
-    scoreUi.innerText = score;
-    ammoUi.innerText = ammo;
-    weaponUi.innerText = "ДРОБОВИК [1]";
-    reloadUi.innerText = "";
-    updateWeaponVisibility();
-
-    gameState = 'PLAYING';
-    initAudio();
-    updateDifficultyUi();
-    canvas.requestPointerLock();
+    healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)"; reloadUi.innerText = "";
+    updateWeaponVisibility(); gameState = 'PLAYING'; initAudio(); updateDifficultyUi(); canvas.requestPointerLock();
 }
 
-// Заполнение логическими врагами при старте
 for(let i = 0; i < 7; i++) spawnEnemy(false);
 
 const keys = {};
 window.addEventListener('keydown', e => {
-    if (e.code === 'KeyE') {
-        toggleShop();
-        return;
-    }
-    
+    if (e.code === 'KeyE') { toggleShop(); return; }
     if (gameState !== 'PLAYING') return;
     keys[e.code] = true;
     
     if (e.code === 'Digit1') { 
         currentWeapon = 'shotgun'; 
-        weaponUi.innerText = "ДРОБОВИК [1]"; 
-        reloadUi.innerText = ""; 
+        weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/2)`; 
+        reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; 
         updateWeaponVisibility();
     }
     if (e.code === 'Digit2') { 
         if (weaponsUnlocked.rifle) {
-            currentWeapon = 'rifle'; 
-            weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/30)`; 
-            reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; 
-            updateWeaponVisibility();
-        } else {
-            showCenterMessage("ЗАБЛОКИРОВАНО! Купите Автомат в магазине (E)");
-        }
+            currentWeapon = 'rifle'; weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/30)`; reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
+        } else { showCenterMessage("ЗАБЛОКИРОВАНО! Купите Автомат в магазине (E)"); }
     }
     if (e.code === 'Digit3') { 
         if (weaponsUnlocked.rocket) {
-            currentWeapon = 'rocket'; 
-            weaponUi.innerText = `РАКЕТНИЦА [3] ${rocketLoaded ? '(ГОТОВА)' : '(ЗАРЯЖАЕТСЯ)'}`; 
-            reloadUi.innerText = !rocketLoaded ? "(ПЕРЕЗАРЯДКА...)" : "";
-            updateWeaponVisibility();
-        } else {
-            showCenterMessage("ЗАБЛОКИРОВАНО! Купите Ракетницу в магазине (E)");
-        }
+            currentWeapon = 'rocket'; weaponUi.innerText = `РАКЕТНИЦА [3] ${rocketLoaded ? '(ГОТОВА)' : '(ЗАРЯЖАЕТСЯ)'}`; reloadUi.innerText = !rocketLoaded ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
+        } else { showCenterMessage("ЗАБЛОКИРОВАНО! Купите Ракетницу в магазине (E)"); }
     }
-    
     if (e.code === 'Space') {
-        if (isOnGround) {
-            playerVelZ = JUMP_VELOCITY;
-            isOnGround = false;
-        }
-        keys[e.code] = false;
-        e.preventDefault();
+        if (isOnGround) { playerVelZ = JUMP_VELOCITY; isOnGround = false; }
+        keys[e.code] = false; e.preventDefault();
     }
-    if (e.code === 'KeyR' && currentWeapon === 'rifle' && rifleClip < 30 && !isReloading && ammo > 0) {
-        startRifleReload();
+    // РУЧНАЯ ПЕРЕЗАРЯДКА НА R ДЛЯ ДРОБОВИКА И АВТОМАТА
+    if (e.code === 'KeyR' && !isReloading && ammo > 0) {
+        if (currentWeapon === 'shotgun' && shotgunClip < 2) startShotgunReload();
+        if (currentWeapon === 'rifle' && rifleClip < 30) startRifleReload();
     }
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
-let isMouseDown = false;
-let isMouseLocked = false;
-
-canvas.addEventListener('mousedown', (e) => {
-    if (gameState !== 'PLAYING') return;
-    isMouseDown = true;
-    executeShot();
-});
+let isMouseDown = false; let isMouseLocked = false;
+canvas.addEventListener('mousedown', () => { if (gameState === 'PLAYING') { isMouseDown = true; executeShot(); } });
 window.addEventListener('mouseup', () => isMouseDown = false);
-
-document.addEventListener('pointerlockchange', () => {
-    isMouseLocked = (document.pointerLockElement === canvas);
-});
-
+document.addEventListener('pointerlockchange', () => { isMouseLocked = (document.pointerLockElement === canvas); });
 canvas.addEventListener('mousemove', (e) => {
     if (isMouseLocked && gameState === 'PLAYING') {
-        let deltaX = e.movementX || 0;
-        let deltaY = e.movementY || 0;
-        
-        playerAngle += deltaX * 0.0025;
-        playerPitch -= deltaY * 0.0025;
+        playerAngle += (e.movementX || 0) * 0.0025; playerPitch -= (e.movementY || 0) * 0.0025;
         playerPitch = Math.max(-Math.PI / 3.5, Math.min(Math.PI / 3.5, playerPitch));
     }
 });
 
-// Добавляем поддержку жестов и касаний на сенсорных устройствах
-let touchStartX = 0;
-let touchStartY = 0;
-canvas.addEventListener('touchstart', (e) => {
-    if (gameState === 'PLAYING') {
-        const touch = e.touches[0];
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
-        executeShot(); // Стрельба при одиночном нажатии на экран мобильного
-    }
-});
+let touchStartX = 0; let touchStartY = 0;
+canvas.addEventListener('touchstart', (e) => { if (gameState === 'PLAYING') { const touch = e.touches[0]; touchStartX = touch.clientX; touchStartY = touch.clientY; executeShot(); } });
 canvas.addEventListener('touchmove', (e) => {
     if (gameState === 'PLAYING' && e.touches.length > 0) {
         const touch = e.touches[0];
-        const dx = touch.clientX - touchStartX;
-        const dy = touch.clientY - touchStartY;
-        
-        playerAngle += dx * 0.005;
-        playerPitch -= dy * 0.005;
+        playerAngle += (touch.clientX - touchStartX) * 0.005; playerPitch -= (touch.clientY - touchStartY) * 0.005;
         playerPitch = Math.max(-Math.PI / 3.5, Math.min(Math.PI / 3.5, playerPitch));
-        
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
+        touchStartX = touch.clientX; touchStartY = touch.clientY;
     }
 });
 
 function executeShot() {
     if (health <= 0 || gameState !== 'PLAYING') return;
-
     if (currentWeapon === 'shotgun') {
-        if (!isShooting && ammo > 0) {
-            isShooting = true;
-            shootTimer = 0;
-            ammo--;
-            ammoUi.innerText = ammo;
-            playShotgunSound();
-            checkHit(0.18, BASE_SHOTGUN_DAMAGE * damageMultiplier);
+        // УЛУЧШЕННЫЙ ДРОБОВИК: проверка магазина на 2 патрона и увеличенный урон
+        if (!isReloading && shotgunClip > 0 && !isShooting && ammo > 0) {
+            isShooting = true; shootTimer = 0; shotgunClip--; ammo--;
+            ammoUi.innerText = ammo; weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/2)`;
+            playShotgunSound(); checkHit(0.18, BASE_SHOTGUN_DAMAGE * damageMultiplier);
+            if (shotgunClip <= 0 && ammo > 0) startShotgunReload();
         }
     } else if (currentWeapon === 'rifle') {
         if (!isReloading && rifleClip > 0 && ammo > 0 && rifleFireRateTimer <= 0) {
-            isShooting = true;
-            shootTimer = 0;
-            rifleClip--;
-            ammo--;
-            ammoUi.innerText = ammo;
-            weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/30)`;
-            rifleFireRateTimer = 0.12; 
-            playPlasmaSound();
-            checkHit(0.06, BASE_RIFLE_DAMAGE * damageMultiplier);
-
-            if (rifleClip <= 0 && ammo > 0) {
-                startRifleReload();
-            }
+            isShooting = true; shootTimer = 0; rifleClip--; ammo--;
+            ammoUi.innerText = ammo; weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/30)`;
+            rifleFireRateTimer = 0.12; playPlasmaSound(); checkHit(0.06, BASE_RIFLE_DAMAGE * damageMultiplier);
+            if (rifleClip <= 0 && ammo > 0) startRifleReload();
         }
     } else if (currentWeapon === 'rocket') {
         if (rocketLoaded) {
-            isShooting = true;
-            shootTimer = 0;
-            rocketLoaded = false;
-            rocketReloadTimer = rocketReloadDuration;
-            reloadUi.innerText = "(ЗАРЯЖАЕТСЯ...)";
-            playRocketLaunchSound();
-            
-            projectiles.push({
-                x: playerX + Math.cos(playerAngle) * 0.5,
-                y: playerY + Math.sin(playerAngle) * 0.5,
-                z: playerZ + 0.5,
-                vx: Math.cos(playerAngle) * 12.0,
-                vy: Math.sin(playerAngle) * 12.0,
-                vz: playerPitch * 8.0, 
-                damage: BASE_ROCKET_DAMAGE * damageMultiplier
-            });
-
+            isShooting = true; shootTimer = 0; rocketLoaded = false; rocketReloadTimer = rocketReloadDuration;
+            reloadUi.innerText = "(ЗАРЯЖАЕТСЯ...)"; playRocketLaunchSound();
+            projectiles.push({ x: playerX + Math.cos(playerAngle) * 0.5, y: playerY + Math.sin(playerAngle) * 0.5, z: playerZ + 0.5, vx: Math.cos(playerAngle) * 12.0, vy: Math.sin(playerAngle) * 12.0, vz: playerPitch * 8.0, damage: BASE_ROCKET_DAMAGE * damageMultiplier });
             if (currentWeapon === 'rocket') weaponUi.innerText = `РАКЕТНИЦА [3] (ПЕРЕЗАРЯДКА)`;
         }
     }
 }
 
+function startShotgunReload() {
+    isReloading = true; reloadTimer = 1.2; reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)"; playReloadSound();
+}
 function startRifleReload() {
-    isReloading = true;
-    reloadTimer = 1.8; 
-    reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
-    playReloadSound();
+    isReloading = true; reloadTimer = 1.8; reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)"; playReloadSound();
 }
 
 function checkHit(fovSpread, damage) {
-    const rayAngle = playerAngle;
-    let hitTarget = null;
-    let minEnemyDist = Infinity;
-
+    const rayAngle = playerAngle; let hitTarget = null; let minEnemyDist = Infinity;
     function hasLineOfSight(enemy) {
-        const dx = enemy.x - playerX;
-        const dy = enemy.y - playerY;
-        const dist = Math.hypot(dx, dy);
-        const steps = Math.max(10, Math.floor(dist / 0.05));
-        const stepX = dx / steps;
-        const stepY = dy / steps;
-        let cx = playerX;
-        let cy = playerY;
+        const dx = enemy.x - playerX; const dy = enemy.y - playerY; const dist = Math.hypot(dx, dy);
+        const steps = Math.max(10, Math.floor(dist / 0.05)); const stepX = dx / steps; const stepY = dy / steps;
+        let cx = playerX; let cy = playerY;
         for (let i = 0; i < steps; i++) {
-            cx += stepX;
-            cy += stepY;
-            const cellX = Math.floor(cx);
-            const cellY = Math.floor(cy);
+            cx += stepX; cy += stepY; const cellX = Math.floor(cx); const cellY = Math.floor(cy);
             if (cellX < 0 || cellX >= mapSize || cellY < 0 || cellY >= mapSize) return false;
             if (map[cellY * mapSize + cellX] > 0) {
-                const wallDist = Math.hypot(cx - playerX, cy - playerY);
-                if (wallDist + 0.2 < dist) return false;
+                if (Math.hypot(cx - playerX, cy - playerY) + 0.2 < dist) return false;
             }
         }
         return true;
@@ -1870,145 +1206,86 @@ function checkHit(fovSpread, damage) {
     enemies.forEach(enemy => {
         let enemyAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX);
         let angleDiff = Math.abs(enemyAngle - rayAngle);
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2; while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         if (angleDiff < fovSpread || angleDiff > Math.PI * 2 - fovSpread) {
             let dist = Math.hypot(enemy.x - playerX, enemy.y - playerY);
-            if (dist < minEnemyDist && hasLineOfSight(enemy)) {
-                minEnemyDist = dist;
-                hitTarget = enemy;
-            }
+            if (dist < minEnemyDist && hasLineOfSight(enemy)) { minEnemyDist = dist; hitTarget = enemy; }
         }
     });
 
     if (hitTarget) {
-        hitTarget.health -= damage;
-        spawnBlood(hitTarget.x, hitTarget.y, damage / 2);
-        if (hitTarget.type === 'boss') {
-            bossHpUi.innerText = Math.max(0, Math.floor(hitTarget.health));
-        }
-        hitTarget.x -= Math.cos(playerAngle) * 0.12;
-        hitTarget.y -= Math.sin(playerAngle) * 0.12;
-        if (multiplayer.enabled && hitTarget.id) {
-            sendNetworkHit(hitTarget.id, damage);
-        }
+        hitTarget.health -= damage; spawnBlood(hitTarget.x, hitTarget.y, damage / 2);
+        if (hitTarget.type === 'boss') bossHpUi.innerText = Math.max(0, Math.floor(hitTarget.health));
+        hitTarget.x -= Math.cos(playerAngle) * 0.12; hitTarget.y -= Math.sin(playerAngle) * 0.12;
+        if (multiplayer.enabled && hitTarget.id) sendNetworkHit(hitTarget.id, damage);
     }
 }
 
 function update(dt) {
     if (gameState !== 'PLAYING') return;
-
     if (health <= 0) {
-        gameState = 'GAMEOVER';
-        document.getElementById("death-stats").innerHTML = `Ваш финальный счет: <span style="color:yellow; font-size:24px;">${score}</span> очков!`;
-        document.getElementById("death-overlay").style.display = 'flex';
-        document.exitPointerLock();
-        return;
+        gameState = 'GAMEOVER'; document.getElementById("death-stats").innerHTML = `Счет: <span style="color:yellow; font-size:24px;">${score}</span>!`;
+        document.getElementById("death-overlay").style.display = 'flex'; document.exitPointerLock(); return;
     }
+    if (isMouseDown) executeShot();
+    if (messageTimer > 0) messageTimer -= dt;
 
-    if (isMouseDown) {
-        executeShot();
-    }
-
-    if (messageTimer > 0) {
-        messageTimer -= dt;
-    }
-
-    // Физика прыжка игрока
     if (!isOnGround) {
-        playerVelZ -= GRAVITY * dt;
-        playerZ += playerVelZ * dt;
-        
-        const cellX = Math.floor(playerX);
-        const cellY = Math.floor(playerY);
-        const cellValue = map[cellY * mapSize + cellX];
+        playerVelZ -= GRAVITY * dt; playerZ += playerVelZ * dt;
+        const cellValue = map[Math.floor(playerY) * mapSize + Math.floor(playerX)];
         const platformHeight = (cellValue === 6) ? 1.0 : 0;
-        
-        if (playerZ <= platformHeight) {
-            playerZ = platformHeight;
-            playerVelZ = 0;
-            isOnGround = true;
-        }
+        if (playerZ <= platformHeight) { playerZ = platformHeight; playerVelZ = 0; isOnGround = true; }
     }
 
-    const moveSpeed = 4.2 * dt;
-    const rotSpeed = 2.4 * dt;
-
-    if (keys['ArrowLeft'])  playerAngle -= rotSpeed;
-    if (keys['ArrowRight']) playerAngle += rotSpeed;
-
-    let newX = playerX;
-    let newY = playerY;
-    isMoving = false;
-
+    const moveSpeed = 4.2 * dt; const rotSpeed = 2.4 * dt;
+    if (keys['ArrowLeft'])  playerAngle -= rotSpeed; if (keys['ArrowRight']) playerAngle += rotSpeed;
+    let newX = playerX; let newY = playerY; isMoving = false;
     if (keys['KeyW'] || keys['ArrowUp']) { newX += Math.cos(playerAngle) * moveSpeed; newY += Math.sin(playerAngle) * moveSpeed; isMoving = true; }
     if (keys['KeyS'] || keys['ArrowDown']) { newX -= Math.cos(playerAngle) * moveSpeed; newY -= Math.sin(playerAngle) * moveSpeed; isMoving = true; }
     if (keys['KeyA']) { newX += Math.cos(playerAngle - Math.PI / 2) * moveSpeed; newY += Math.sin(playerAngle - Math.PI / 2) * moveSpeed; isMoving = true; }
     if (keys['KeyD']) { newX += Math.cos(playerAngle + Math.PI / 2) * moveSpeed; newY += Math.sin(playerAngle + Math.PI / 2) * moveSpeed; isMoving = true; }
 
     let canPassPlatforms = playerZ > 1.3;  
-    let checkCellX = Math.floor(newX);
-    let checkCellY = Math.floor(playerY);
-    let cellValueX = map[checkCellY * mapSize + checkCellX];
-    if (cellValueX === 0 || (cellValueX === 6 && canPassPlatforms)) {
-        playerX = newX;
-    }
-    
-    checkCellX = Math.floor(playerX);
-    checkCellY = Math.floor(newY);
-    let cellValueY = map[checkCellY * mapSize + checkCellX];
-    if (cellValueY === 0 || (cellValueY === 6 && canPassPlatforms)) {
-        playerY = newY;
-    }
+    let cellValueX = map[Math.floor(playerY) * mapSize + Math.floor(newX)];
+    if (cellValueX === 0 || (cellValueX === 6 && canPassPlatforms)) playerX = newX;
+    let cellValueY = map[Math.floor(newY) * mapSize + Math.floor(playerX)];
+    if (cellValueY === 0 || (cellValueY === 6 && canPassPlatforms)) playerY = newY;
 
     if (rifleFireRateTimer > 0) rifleFireRateTimer -= dt;
-    if (isShooting) {
-        shootTimer += dt * 16;
-        if (shootTimer > 4) isShooting = false;
-    }
+    if (isShooting) { shootTimer += dt * 16; if (shootTimer > 4) isShooting = false; }
     walkCycle += isMoving ? dt * 11 : 0;
 
     if (isReloading) {
         reloadTimer -= dt;
         if (reloadTimer <= 0) {
-            isReloading = false;
-            let toLoad = Math.min(30, ammo);
-            rifleClip = toLoad;
-            reloadUi.innerText = "";
-            if (currentWeapon === 'rifle') weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/30)`;
+            isReloading = false; reloadUi.innerText = "";
+            if (currentWeapon === 'shotgun') {
+                shotgunClip = Math.min(2, ammo);
+                weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/2)`;
+            } else if (currentWeapon === 'rifle') {
+                rifleClip = Math.min(30, ammo);
+                weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/30)`;
+            }
         }
     }
 
     if (!rocketLoaded) {
         rocketReloadTimer -= dt;
         if (rocketReloadTimer <= 0) {
-            rocketLoaded = true;
-            reloadUi.innerText = "";
+            rocketLoaded = true; reloadUi.innerText = "";
             if (currentWeapon === 'rocket') weaponUi.innerText = `РАКЕТНИЦА [3] (ГОТОВА)`;
         }
     }
 
-    // Обработка снарядов
     projectiles = projectiles.filter(p => {
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.z += p.vz * dt;
-        
-        let cx = Math.floor(p.x);
-        let cy = Math.floor(p.y);
-        
+        p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+        let cx = Math.floor(p.x); let cy = Math.floor(p.y);
         if (cx < 0 || cx >= mapSize || cy < 0 || cy >= mapSize || map[cy * mapSize + cx] > 0) {
-            spawnExplosion(p.x, p.y, p.z);
-            explodeInRadius(p.x, p.y, p.damage);
-            return false;
+            spawnExplosion(p.x, p.y, p.z); explodeInRadius(p.x, p.y, p.damage); return false;
         }
-
         for (let enemy of enemies) {
             if (Math.hypot(enemy.x - p.x, enemy.y - p.y) < 0.45) {
-                spawnExplosion(p.x, p.y, p.z);
-                explodeInRadius(p.x, p.y, p.damage);
-                return false;
+                spawnExplosion(p.x, p.y, p.z); explodeInRadius(p.x, p.y, p.damage); return false;
             }
         }
         return true;
@@ -2018,135 +1295,92 @@ function update(dt) {
         enemies.forEach(enemy => {
             let dist = Math.hypot(enemy.x - ex, enemy.y - ey);
             if (dist < 3.2) {
-                let damageMultiplierLocal = 1.0 - (dist / 3.2);
-                let currentDmg = dmg * damageMultiplierLocal;
-                enemy.health -= currentDmg;
-                spawnBlood(enemy.x, enemy.y, currentDmg / 3);
-                
-                enemy.x += ((enemy.x - ex) / dist) * 0.7 * damageMultiplierLocal;
-                enemy.y += ((enemy.y - ey) / dist) * 0.7 * damageMultiplierLocal;
-
-                if (enemy.type === 'boss') {
-                    bossHpUi.innerText = Math.max(0, Math.floor(enemy.health));
-                }
-                if (multiplayer.enabled && enemy.id) {
-                    sendNetworkHit(enemy.id, currentDmg);
-                }
+                let damageMultiplierLocal = 1.0 - (dist / 3.2); let currentDmg = dmg * damageMultiplierLocal;
+                enemy.health -= currentDmg; spawnBlood(enemy.x, enemy.y, currentDmg / 3);
+                enemy.x += ((enemy.x - ex) / dist) * 0.7 * damageMultiplierLocal; enemy.y += ((enemy.y - ey) / dist) * 0.7 * damageMultiplierLocal;
+                if (enemy.type === 'boss') bossHpUi.innerText = Math.max(0, Math.floor(enemy.health));
+                if (multiplayer.enabled && enemy.id) sendNetworkHit(enemy.id, currentDmg);
             }
         });
-        
         let distToPlayer = Math.hypot(playerX - ex, playerY - ey);
         if (distToPlayer < 2.5) {
             let dmgFactor = 1.0 - (distToPlayer / 2.5);
-            health -= Math.floor(40 * dmgFactor);
-            health = Math.max(0, health);
-            healthUi.innerText = health;
-            addDamageIndicator(Math.atan2(ey - playerY, ex - playerX));
-            playHurtSound();
+            health = Math.max(0, health - Math.floor(40 * dmgFactor)); healthUi.innerText = health;
+            addDamageIndicator(Math.atan2(ey - playerY, ex - playerX)); playHurtSound();
         }
     }
 
     pickups = pickups.filter(p => {
-        let dist = Math.hypot(playerX - p.x, playerY - p.y);
-        if (dist < 0.6) {
+        if (Math.hypot(playerX - p.x, playerY - p.y) < 0.6) {
             playPickupSound();
-            if (p.type === 'health') {
-                health = Math.min(maxHealth, health + 25);
-                healthUi.innerText = health;
-            } else {
-                ammo = Math.min(200, ammo + 35);
-                ammoUi.innerText = ammo;
-            }
+            if (p.type === 'health') { health = Math.min(maxHealth, health + 25); healthUi.innerText = health; }
+            else { ammo = Math.min(200, ammo + 35); ammoUi.innerText = ammo; }
             return false;
         }
         return true;
     });
 
     particles = particles.filter(p => {
-        p.life -= dt;
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.z += p.vz * dt;
-        
-        if (p.type === 'blood') {
-            p.vz -= GRAVITY * 0.5 * dt;
-            if (p.z <= 0) {
-                p.z = 0; p.vx = 0; p.vy = 0; p.vz = 0; 
-            }
-        }
+        p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+        if (p.type === 'blood') { p.vz -= GRAVITY * 0.5 * dt; if (p.z <= 0) { p.z = 0; p.vx = 0; p.vy = 0; p.vz = 0; } }
         return p.life > 0;
-    });
-
-    damageIndicators = damageIndicators.filter(indicator => {
-        indicator.time += dt;
-        return indicator.time < indicator.maxTime;
     });
 
     if (!multiplayer.enabled) {
         regularSpawnTimer += dt;
         if (regularSpawnTimer >= DIFFICULTY_SETTINGS[difficulty].spawnInterval) {
-            spawnEnemy(false); 
-            spawnEnemy(false);
-            regularSpawnTimer = 0;
+            spawnEnemy(false); spawnEnemy(false); regularSpawnTimer = 0;
         }
-
         bossSpawnTimer += dt;
-        if (bossSpawnTimer >= 180 && !hasBoss) {
-            spawnEnemy(true);
-            bossSpawnTimer = 0;
-        }
+        if (bossSpawnTimer >= 180 && !hasBoss) { spawnEnemy(true); bossSpawnTimer = 0; }
 
         enemies = enemies.filter(enemy => {
             if (enemy.health <= 0) {
                 spawnPickup(enemy.x, enemy.y);
-                if (enemy.type === 'boss') {
-                    score += 2500;
-                    hasBoss = false;
-                    bossUi.style.display = "none";
-                } else {
-                    score += enemy.type === 'creeper' ? 100 : 150;
-                }
-                scoreUi.innerText = score;
-                return false;
+                if (enemy.type === 'boss') { score += 2500; hasBoss = false; bossUi.style.display = "none"; }
+                else { score += enemy.type === 'creeper' ? 100 : 150; }
+                scoreUi.innerText = score; return false;
             }
 
             if (enemy.isFlying) {
-                enemy.hoverPhase += dt * 2.2;
-                enemy.z = 0.9 + Math.sin(enemy.hoverPhase) * 0.15;
+                enemy.hoverPhase += dt * 2.2; enemy.z = 0.9 + Math.sin(enemy.hoverPhase) * 0.15;
             }
 
-            let dx = playerX - enemy.x;
-            let dy = playerY - enemy.y;
-            let dist = Math.hypot(dx, dy);
+            let dx = playerX - enemy.x; let dy = playerY - enemy.y; let dist = Math.hypot(dx, dy);
 
+            // ФИКС ЗАСТРЕВАНИЯ В СТЕНАХ: Умное скольжение вдоль стен с компенсацией скорости
             if (dist < 22 && dist > 0.35) {
-                let moveX = enemy.x + (dx / dist) * enemy.speed * dt;
-                let moveY = enemy.y + (dy / dist) * enemy.speed * dt;
+                let stepX = (dx / dist) * enemy.speed * dt;
+                let stepY = (dy / dist) * enemy.speed * dt;
+                let nextX = enemy.x + stepX;
+                let nextY = enemy.y + stepY;
                 
-                if (map[Math.floor(enemy.y) * mapSize + Math.floor(moveX)] === 0) enemy.x = moveX;
-                if (map[Math.floor(moveY) * mapSize + Math.floor(enemy.x)] === 0) enemy.y = moveY;
+                // Проверка по оси X
+                if (map[Math.floor(enemy.y) * mapSize + Math.floor(nextX)] === 0) {
+                    enemy.x = nextX;
+                } else {
+                    // Если уперлись в стену по X, направляем импульс скольжения вдоль Y
+                    stepY *= 1.35;
+                }
+                
+                // Проверка по оси Y
+                if (map[Math.floor(enemy.y + stepY) * mapSize + Math.floor(enemy.x)] === 0) {
+                    enemy.y += stepY;
+                } else if (map[Math.floor(enemy.y) * mapSize + Math.floor(enemy.x + stepX * 1.35)] === 0) {
+                    // Если уперлись по Y, ускоряем скольжение вдоль X
+                    enemy.x += stepX * 1.35;
+                }
             }
 
             if (dist <= 0.6) {
                 if (enemy.type === 'creeper') {
-                    health -= 45; 
-                    enemy.health = 0; 
-                    spawnExplosion(enemy.x, enemy.y, 0.2);
-                } else if (enemy.type === 'boss') {
-                    health -= 45 * dt; 
-                } else {
-                    health -= 14 * dt; 
-                }
+                    health -= 45; enemy.health = 0; spawnExplosion(enemy.x, enemy.y, 0.2);
+                } else if (enemy.type === 'boss') { health -= 45 * dt; } else { health -= 14 * dt; }
+                health = Math.max(0, Math.floor(health)); healthUi.innerText = health;
                 
-                health = Math.max(0, Math.floor(health));
-                healthUi.innerText = health;
-
-                const enemyAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX);
-                addDamageIndicator(enemyAngle);
-                
-                if (Math.random() < 0.15) {
-                    playHurtSound();
-                }
+                // ВЫЗОВ НАПРАВЛЕННОГО ИНДИКАТОРА УРОНА (ДУГА ВОКРУГ ПРИЦЕЛА)
+                addDamageIndicator(Math.atan2(enemy.y - playerY, enemy.x - playerX));
+                if (Math.random() < 0.15) playHurtSound();
             }
             return true;
         });
@@ -2163,10 +1397,7 @@ function update(dt) {
 
 function renderMinimap() {
     mctx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
-    
     const cellSize = minimapCanvas.width / mapSize;
-    
-    // Стены
     for (let y = 0; y < mapSize; y++) {
         for (let x = 0; x < mapSize; x++) {
             const cellValue = map[y * mapSize + x];
@@ -2176,137 +1407,49 @@ function renderMinimap() {
             }
         }
     }
-    
-    // Предметы (Пикапы)
     pickups.forEach(p => {
-        let px = (p.x / mapSize) * minimapCanvas.width;
-        let py = (p.y / mapSize) * minimapCanvas.height;
-        mctx.fillStyle = p.type === 'health' ? '#00ff66' : '#ffff00';
-        mctx.fillRect(px - 2, py - 2, 4, 4);
+        let px = (p.x / mapSize) * minimapCanvas.width; let py = (p.y / mapSize) * minimapCanvas.height;
+        mctx.fillStyle = p.type === 'health' ? '#00ff66' : '#ffff00'; mctx.fillRect(px - 2, py - 2, 4, 4);
     });
-
-    // Монстры
     enemies.forEach(enemy => {
-        let mmX = (enemy.x / mapSize) * minimapCanvas.width;
-        let mmY = (enemy.y / mapSize) * minimapCanvas.height;
-        
-        if (enemy.type === 'boss') {
-            mctx.fillStyle = "#ff00ff";
-            mctx.fillRect(mmX - 4, mmY - 4, 8, 8);
-        } else if (enemy.type === 'creeper') {
-            mctx.fillStyle = "#00ff00";
-            mctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5);
-        } else if (enemy.type === 'flyer') {
-            mctx.fillStyle = "#9fe0c0";
-            mctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5);
-        } else {
-            mctx.fillStyle = "#ffff00";
-            mctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5);
-        }
+        let mmX = (enemy.x / mapSize) * minimapCanvas.width; let mmY = (enemy.y / mapSize) * minimapCanvas.height;
+        if (enemy.type === 'boss') { mctx.fillStyle = "#ff00ff"; mctx.fillRect(mmX - 4, mmY - 4, 8, 8); }
+        else if (enemy.type === 'creeper') { mctx.fillStyle = "#00ff00"; mctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5); }
+        else if (enemy.type === 'flyer') { mctx.fillStyle = "#9fe0c0"; mctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5); }
+        else { mctx.fillStyle = "#ffff00"; mctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5); }
     });
-    
-    // Направление взгляда игрока
-    let playerMMX = (playerX / mapSize) * minimapCanvas.width;
-    let playerMMY = (playerY / mapSize) * minimapCanvas.height;
-    mctx.fillStyle = "#ff0000";
-    mctx.beginPath();
-    mctx.arc(playerMMX, playerMMY, 3, 0, Math.PI * 2);
-    mctx.fill();
-    
-    let dirX = playerMMX + Math.cos(playerAngle) * 12;
-    let dirY = playerMMY + Math.sin(playerAngle) * 12;
-    mctx.strokeStyle = "#ff0000";
-    mctx.lineWidth = 2;
-    mctx.beginPath();
-    mctx.moveTo(playerMMX, playerMMY);
-    mctx.lineTo(dirX, dirY);
-    mctx.stroke();
+    let playerMMX = (playerX / mapSize) * minimapCanvas.width; let playerMMY = (playerY / mapSize) * minimapCanvas.height;
+    mctx.fillStyle = "#ff0000"; mctx.beginPath(); mctx.arc(playerMMX, playerMMY, 3, 0, Math.PI * 2); mctx.fill();
+    let dirX = playerMMX + Math.cos(playerAngle) * 12; let dirY = playerMMY + Math.sin(playerAngle) * 12;
+    mctx.strokeStyle = "#ff0000"; mctx.lineWidth = 2; mctx.beginPath(); mctx.moveTo(playerMMX, playerMMY); mctx.lineTo(dirX, dirY); mctx.stroke();
 }
 
 function render3D() {
-    // 1. Позиционируем камеру в соответствии с позицией игрока в 2D-логике
-    // Карта (X, Y) отображается в 3D (X, Z). Прыжок/Высота (Z) отображается в 3D (Y)
     camera.position.set(playerX, 0.75 + playerZ, playerY);
-
-    // 2. Рассчитываем вектор взгляда
-    const lookX = playerX + Math.cos(playerAngle);
-    const lookY = 0.75 + playerZ + Math.tan(playerPitch);
-    const lookZ = playerY + Math.sin(playerAngle);
+    const lookX = playerX + Math.cos(playerAngle); const lookY = 0.75 + playerZ + Math.tan(playerPitch); const lookZ = playerY + Math.sin(playerAngle);
     camera.lookAt(new THREE.Vector3(lookX, lookY, lookZ));
-
-    // 3. Анимация раскачивания оружия в руках
-    let swayX = 0;
-    let swayY = 0;
-    if (isMoving && !isShooting) {
-        swayX = Math.sin(walkCycle) * 0.012;
-        swayY = Math.abs(Math.cos(walkCycle)) * 0.008;
-    }
-
-    let recoilZ = 0;
-    let recoilY = 0;
+    let swayX = 0; let swayY = 0;
+    if (isMoving && !isShooting) { swayX = Math.sin(walkCycle) * 0.012; swayY = Math.abs(Math.cos(walkCycle)) * 0.008; }
+    let recoilZ = 0; let recoilY = 0;
     if (isShooting) {
-        if (currentWeapon === 'shotgun') {
-            recoilZ = (shootTimer < 1.8) ? 0.09 : -0.03;
-            recoilY = (shootTimer < 1.8) ? 0.04 : -0.01;
-        } else if (currentWeapon === 'rifle') {
-            recoilZ = Math.sin(shootTimer * 4.5) * 0.02;
-            recoilY = Math.sin(shootTimer * 4.5) * 0.005;
-        } else {
-            recoilZ = Math.sin(shootTimer * 3) * 0.06;
-            recoilY = Math.sin(shootTimer * 3) * 0.02;
-        }
+        if (currentWeapon === 'shotgun') { recoilZ = (shootTimer < 1.8) ? 0.09 : -0.03; recoilY = (shootTimer < 1.8) ? 0.04 : -0.01; }
+        else if (currentWeapon === 'rifle') { recoilZ = Math.sin(shootTimer * 4.5) * 0.02; recoilY = Math.sin(shootTimer * 4.5) * 0.005; }
+        else { recoilZ = Math.sin(shootTimer * 3) * 0.06; recoilY = Math.sin(shootTimer * 3) * 0.02; }
     }
-
-    let reloadYOffset = 0;
-    if (isReloading) {
-        reloadYOffset = -0.3; // Оружие уходит вниз во время перезарядки
-    }
-
-    // Сдвигаем точку привязки оружия относительно камеры
-    weaponPivot.position.set(swayX, reloadYOffset + recoilY, recoilZ);
-
-    // 4. Синхронизируем состояние логических объектов в WebGL мир
-    syncEntitiesWith3DScene();
-
-    // 5. Рендерим Three.js 3D сцену
-    renderer.render(scene, camera);
-}
-
-function render2DOverlays() {
-    // В отличие от 3D, индикаторы урона и уведомления отображаются с помощью HTML-слоев 
-    // или легкой стилизации HUD. Урон выводится через подсвечиваемый HUD
-    if (damageIndicators.length > 0) {
-        canvas.style.boxShadow = "inset 0 0 50px rgba(255, 0, 0, 0.9)";
-    } else {
-        canvas.style.boxShadow = "none";
-    }
+    weaponPivot.position.set(swayX, (isReloading ? -0.3 : 0) + recoilY, recoilZ);
+    syncEntitiesWith3DScene(); renderer.render(scene, camera);
 }
 
 let lastTime = performance.now();
 function gameLoop(currentTime) {
-    let dt = (currentTime - lastTime) / 1000;
-    if (dt > 0.1) dt = 0.1;
-    lastTime = currentTime;
-    
-    update(dt);
-    render3D();
-    renderMinimap();
-    render2DOverlays();
-    
-    requestAnimationFrame(gameLoop);
+    let dt = (currentTime - lastTime) / 1000; if (dt > 0.1) dt = 0.1; lastTime = currentTime;
+    update(dt); render3D(); renderMinimap(); requestAnimationFrame(gameLoop);
 }
 
-// Запуск игрового конвейера
-window.onload = function () {
-    init3D();
-    requestAnimationFrame(gameLoop);
-}
-
-// Корректная обработка изменения размеров контейнера
+window.onload = function () { init3D(); requestAnimationFrame(gameLoop); }
 window.addEventListener('resize', () => {
     if (camera && renderer) {
-        camera.aspect = canvas.clientWidth / canvas.clientHeight;
-        camera.updateProjectionMatrix();
+        camera.aspect = canvas.clientWidth / canvas.clientHeight; camera.updateProjectionMatrix();
         renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     }
 });
