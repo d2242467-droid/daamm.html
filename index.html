@@ -223,12 +223,17 @@
             0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--deg)) scale(0.65); }
             100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--deg)) scale(1.15); }
         }
+        #flash-overlay {
+            position: fixed; inset: 0; background: #ffffff; opacity: 0;
+            pointer-events: none; z-index: 50; transition: none;
+        }
     </style>
 </head>
 <body>
 
     <button id="audio-toggle" onclick="toggleAudio()">МУЗЫКА: ВЫКЛ</button>
     <div id="boss-ui">⚠ ВНИМАНИЕ: БОСС БЛИЗКО (HP: <span id="boss-hp">1000</span>/1000) ⚠</div>
+    <div id="flash-overlay"></div>
     
     <div id="game-container">
         <div id="crosshair"></div>
@@ -242,7 +247,8 @@
                <b>Мышь</b> — Обзор во все стороны<br>
                <b>ЛКМ</b> — Стрельба | <b>R</b> — Перезарядка<br>
                <b>Пробел</b> — Прыжок | <b>E</b> — Магазин Улучшений<br>
-               <b>1, 2, 3, 4</b> — Смена оружия
+               <b>1, 2, 3, 4</b> — Смена оружия | <b>M</b> — Нож (ближний бой)<br>
+               <b>Q</b> — Бросить гранату | <b>G</b> — Сменить тип гранаты
             </p>
             <p class="text-[#e0aaff] mb-2 text-sm">Выберите сложность (Арена Brawl Stars):</p>
             <div class="flex gap-3 mb-4">
@@ -297,6 +303,26 @@
                     <p>Магазин на 100 патронов. Слабый урон за выстрел, но огромная скорострельность.</p>
                     <button class="buy-btn" id="btn-buy-minigun" onclick="buyUpgrade('minigun')">Разблокировать [4] <br> <span id="cost-minigun">2000</span> очков</button>
                 </div>
+                <div class="shop-item">
+                    <h3>Ёмкость Магазинов</h3>
+                    <p id="desc-clip">Увеличивает вместимость магазина для всех видов оружия с патронами.</p>
+                    <button class="buy-btn" id="btn-buy-clipCapacity" onclick="buyUpgrade('clipCapacity')">Улучшить <br> <span id="cost-clipCapacity">700</span> очков</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Осколочная Граната</h3>
+                    <p>Мгновенный урон по площади при взрыве. Нажмите Q чтобы бросить.</p>
+                    <button class="buy-btn" id="btn-buy-frag" onclick="buyUpgrade('frag')">Купить (+2) <br> <span id="cost-frag">250</span> очков</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Коктейль Молотова</h3>
+                    <p>Создаёт горящую зону на полу, наносящую урон со временем.</p>
+                    <button class="buy-btn" id="btn-buy-molotov" onclick="buyUpgrade('molotov')">Купить (+2) <br> <span id="cost-molotov">300</span> очков</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Светошумовая Граната</h3>
+                    <p>Оглушает и обездвиживает врагов поблизости на несколько секунд.</p>
+                    <button class="buy-btn" id="btn-buy-flash" onclick="buyUpgrade('flash')">Купить (+2) <br> <span id="cost-flash">300</span> очков</button>
+                </div>
                 <div class="shop-item" style="grid-column: span 2;">
                     <h3>Поставка Боеприпасов</h3>
                     <p>Пополняет ваш общий боекомплект.</p>
@@ -320,6 +346,7 @@
         <div>ЗДОРОВЬЕ: <span id="health-val">100</span>%</div>
         <div>ОРУЖИЕ: <span id="weapon-name" style="color: #fff;">ДРОБОВИК [1] (2/2)</span></div>
         <div>ПАТРОНЫ: <span id="ammo-val">100</span> <span id="reload-msg" style="color: yellow;"></span></div>
+        <div>ГРАНАТЫ: <span id="grenade-val" style="color:#ffaa55;">ГРАНАТА (0) [Q]</span></div>
         <div>СЧЕТ: <span id="score-val">0</span></div>
         <div>СЛОЖНОСТЬ: <span id="difficulty-val" style="color:#ffd700;">ЛЕГКО</span></div>
         <div><button onclick="toggleShop()" class="shop-btn-small">МАГАЗИН (E)</button></div>
@@ -346,108 +373,108 @@ const mapSize = 32;
 const MAPS = {
     // 1. Классическая карта (Легко)
     EASY: [
-        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
-        1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
-        1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
-        1,0,2,2,0,0,0,0,0,0,0,0,5,5,2,0,0,2,5,5,0,0,0,0,0,0,0,0,2,2,0,1,
-        1,0,2,2,0,0,0,0,0,2,2,2,5,5,0,0,0,0,5,5,2,2,2,0,0,0,0,0,2,2,0,1,
-        1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,1,
-        1,0,0,0,4,4,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,4,4,0,0,0,1,
-        1,0,1,0,4,4,0,0,5,5,0,0,0,5,5,0,0,5,5,0,0,0,5,5,0,0,4,4,0,1,0,1,
-        1,0,0,0,0,0,2,2,2,0,0,0,0,5,0,0,0,0,5,0,0,0,0,2,2,2,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,2,2,2,0,0,0,0,5,0,0,0,0,5,0,0,0,0,2,2,2,0,0,0,0,0,1,
-        1,0,1,0,4,4,0,0,5,5,0,0,0,5,5,0,0,5,5,0,0,0,5,5,0,0,4,4,0,1,0,1,
-        1,0,0,0,4,4,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,4,4,0,0,0,1,
-        1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,
-        1,0,2,2,0,0,0,0,0,2,2,2,5,5,0,0,0,0,5,5,2,2,2,0,0,0,0,0,2,2,0,1,
-        1,0,2,2,0,0,0,0,0,0,0,0,5,5,2,0,0,2,5,5,0,0,0,0,0,0,0,0,2,2,0,1,
-        1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
-        1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,
-        1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,0,0,0,5,5,2,0,0,2,5,5,0,0,0,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,2,2,2,5,5,0,0,0,0,5,5,2,2,2,0,0,0,0,0,2,2,0,1,
+    1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,1,
+    1,0,0,0,4,4,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,4,4,0,0,0,1,
+    1,0,1,0,4,4,0,0,5,5,0,0,0,5,5,0,0,5,5,0,0,0,5,5,0,0,4,4,0,1,0,1,
+    1,0,0,0,0,0,2,2,2,0,0,0,0,5,0,0,0,0,5,0,0,0,0,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,0,0,0,0,5,0,0,0,0,5,0,0,0,0,2,2,2,0,0,0,0,0,1,
+    1,0,1,0,4,4,0,0,5,5,0,0,0,5,5,0,0,5,5,0,0,0,5,5,0,0,4,4,0,1,0,1,
+    1,0,0,0,4,4,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,4,4,0,0,0,1,
+    1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,
+    1,0,2,2,0,0,0,0,0,2,2,2,5,5,0,0,0,0,5,5,2,2,2,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,0,0,0,5,5,2,0,0,2,5,5,0,0,0,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,4,4,0,0,0,2,0,0,2,0,0,0,4,4,0,0,0,0,0,2,2,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
     ],
     // 2. Шорох листьев / Rustling Leaves (Средне - много кустов и фланговых коридоров)
     MEDIUM: [
-        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-        1,0,0,0,3,3,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,3,3,0,0,0,1,
-        1,0,0,0,3,3,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,3,3,0,0,0,1,
-        1,0,3,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,3,0,1,
-        1,0,3,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,3,0,1,
-        1,0,0,0,2,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,2,0,0,0,1,
-        1,0,0,0,2,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,2,0,0,0,1,
-        1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
-        1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
-        1,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,1,
-        1,0,0,0,3,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,3,0,0,0,1,
-        1,0,2,2,0,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,0,2,2,0,1,
-        1,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,1,
-        1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
-        1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
-        1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
-        1,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,1,
-        1,0,2,2,0,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,0,2,2,0,1,
-        1,0,0,0,3,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,3,0,0,0,1,
-        1,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,1,
-        1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
-        1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
-        1,0,0,0,2,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,2,0,0,0,1,
-        1,0,0,0,2,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,2,0,0,0,1,
-        1,0,3,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,3,0,1,
-        1,0,3,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,3,0,1,
-        1,0,0,0,3,3,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,3,3,0,0,0,1,
-        1,0,0,0,3,3,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,3,3,0,0,0,1,
-        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,2,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,2,0,0,0,1,
+    1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
+    1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
+    1,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,1,
+    1,0,0,0,3,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,3,0,0,0,1,
+    1,0,2,2,0,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,1,
+    1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
+    1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
+    1,0,0,0,0,3,3,0,0,3,3,0,0,2,2,2,2,2,2,0,0,3,3,0,0,3,3,0,0,0,0,1,
+    1,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,1,
+    1,0,2,2,0,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,0,2,2,0,1,
+    1,0,0,0,3,0,0,2,2,0,0,0,3,3,3,0,0,3,3,3,0,0,0,2,2,0,0,3,0,0,0,1,
+    1,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,1,
+    1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
+    1,2,2,0,0,0,3,3,0,0,1,1,0,0,2,2,2,2,0,0,1,1,0,0,3,3,0,0,0,2,2,1,
+    1,0,0,0,2,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,2,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,3,3,0,0,0,0,0,0,3,3,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,2,2,2,0,0,0,0,0,3,3,0,0,0,0,0,2,2,2,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
     ],
         // 3. Разбросанная арена / Scattered Arena (Сложно - на основе карты из Brawl Stars)
     HARD: [
-        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-        1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,5,5,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,5,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-        1,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,1,
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,1,
-        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,5,5,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,5,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
     ]
 };
 let map = MAPS.EASY.slice();
@@ -484,15 +511,20 @@ const GRAVITY = 20.0;
 const JUMP_VELOCITY = 8.0;
 
 const DIFFICULTY_SETTINGS = {
-    EASY:   { label: "ЛЕГКО (КЛАССИКА)",  spawnInterval: 20, creeperHp: 50,  skeletonHp: 100, flyerHp: 100, bossHp: 1000, flyingEnemies: false, flyingBoss: false },
-    MEDIUM: { label: "СРЕДНЕ (ШОРОХ ЛИСТЬЕВ)", spawnInterval: 10, creeperHp: 200, skeletonHp: 200, flyerHp: 200, bossHp: 2000, flyingEnemies: true,  flyingBoss: false },
-    HARD:   { label: "СЛОЖНО (АРЕНА ХАОСА)",   spawnInterval: 10, creeperHp: 500, skeletonHp: 500, flyerHp: 500, bossHp: 5000, flyingEnemies: true,  flyingBoss: true  }
+    EASY:   { label: "ЛЕГКО (КЛАССИКА)",  spawnInterval: 20, creeperHp: 50,  skeletonHp: 100, flyerHp: 100, spiderHp: 70,  bruteHp: 0,   bossHp: 1000, flyingEnemies: false, flyingBoss: false, spidersEnabled: false, brutesEnabled: false },
+    MEDIUM: { label: "СРЕДНЕ (ШОРОХ ЛИСТЬЕВ)", spawnInterval: 10, creeperHp: 200, skeletonHp: 200, flyerHp: 200, spiderHp: 150, bruteHp: 350, bossHp: 2000, flyingEnemies: true,  flyingBoss: false, spidersEnabled: true,  brutesEnabled: false },
+    HARD:   { label: "СЛОЖНО (АРЕНА ХАОСА)",   spawnInterval: 10, creeperHp: 500, skeletonHp: 500, flyerHp: 500, spiderHp: 400, bruteHp: 900, bossHp: 5000, flyingEnemies: true,  flyingBoss: true,  spidersEnabled: true,  brutesEnabled: true  }
 };
 let difficulty = 'EASY';
 
 const multiplayer = { enabled: false, ws: null, myId: null, players: {}, inputSendTimer: 0 };
 let weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false };
-let shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150 };
+let shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300 };
+
+// МАГАЗИН: МАКС. ЁМКОСТЬ ОБОЙМ (растёт при покупке в магазине)
+let maxShotgunClip = 2;
+let maxRifleClip = 30;
+let maxMinigunClip = 100;
 
 let currentWeapon = 'shotgun'; 
 let ammo = 100; 
@@ -506,6 +538,7 @@ let isMoving = false;
 
 let rifleFireRateTimer = 0;
 let minigunFireRateTimer = 0;
+let meleeCooldownTimer = 0;
 let isReloading = false;
 let reloadTimer = 0;
 
@@ -516,12 +549,30 @@ const rocketReloadDuration = 2.5;
 let regularSpawnTimer = 0;
 let bossSpawnTimer = 0;
 let hasBoss = false;
+let hardBossKillCount = 0; // ДИНАМИЧЕСКОЕ МАСШТАБИРОВАНИЕ ЗДОРОВЬЯ НА СЛОЖНОМ УРОВНЕ
 
 // УЛУЧШЕННЫЙ ДРОБОВИК: урон увеличен ровно в 2 раза (было 20, стало 40)
 const BASE_SHOTGUN_DAMAGE = 40;
 const BASE_RIFLE_DAMAGE = 10;
 const BASE_ROCKET_DAMAGE = 100;
 const BASE_MINIGUN_DAMAGE = 5;
+const BASE_MELEE_DAMAGE = 55;
+const MELEE_RANGE = 2.0;
+const MELEE_COOLDOWN = 0.45;
+
+// ГРАНАТЫ
+let grenadeCounts = { frag: 0, molotov: 0, flash: 0 };
+let currentGrenadeType = 'frag';
+let thrownGrenades = [];
+let fireZones = [];
+const GRENADE_TYPES_ORDER = ['frag', 'molotov', 'flash'];
+const BASE_FRAG_DAMAGE = 110;
+const FRAG_RADIUS = 3.5;
+const MOLOTOV_RADIUS = 2.2;
+const MOLOTOV_DURATION = 5.0;
+const MOLOTOV_TICK_DAMAGE = 12; // урона в секунду
+const FLASH_RADIUS = 6.0;
+const FLASH_STUN_DURATION = 3.0;
 
 let messageText = "";
 let messageTimer = 0;
@@ -529,6 +580,7 @@ function showCenterMessage(text) { messageText = text; messageTimer = 2.5; }
 
 let enemies = [];
 let projectiles = []; 
+let enemyProjectiles = [];
 let particles = [];   
 let pickups = [];     
 
@@ -553,7 +605,7 @@ const MUZZLE_FLASH_DURATION = 0.09;
 let mapBlocksGroup;
 let weaponPivot; 
 const entityMeshes = new Map(); 
-let weaponMeshes = { shotgun: null, rifle: null, rocket: null, minigun: null };
+let weaponMeshes = { shotgun: null, rifle: null, rocket: null, minigun: null, melee: null };
 const textures = {};
 
 function makeProceduralNoiseTexture(colorBase, countX=16, countY=16) {
@@ -819,6 +871,17 @@ function create3DWeapons() {
     const mgDrum = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.11, 0.09), new THREE.MeshLambertMaterial({ color: 0xffcc00 }));
     mgDrum.position.set(-0.11, -0.09, 0.05); minigunGroup.add(mgDrum);
     minigunGroup.position.set(0.2, -0.24, -0.35); minigunGroup.visible = false; weaponPivot.add(minigunGroup); weaponMeshes.minigun = minigunGroup;
+
+    const meleeGroup = new THREE.Group();
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.16), new THREE.MeshLambertMaterial({ color: 0x2a1a10 }));
+    handle.position.set(0, 0, 0.05); meleeGroup.add(handle);
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.02, 0.02), new THREE.MeshLambertMaterial({ color: 0x555555 }));
+    guard.position.set(0, 0, -0.04); meleeGroup.add(guard);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.008, 0.3), new THREE.MeshLambertMaterial({ color: 0xc8ccd0, emissive: 0x222222 }));
+    blade.position.set(0, 0, -0.2); meleeGroup.add(blade);
+    const bladeTip = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.05, 4), new THREE.MeshLambertMaterial({ color: 0xc8ccd0 }));
+    bladeTip.rotation.x = -Math.PI / 2; bladeTip.position.set(0, 0, -0.375); meleeGroup.add(bladeTip);
+    meleeGroup.position.set(0.16, -0.2, -0.35); meleeGroup.rotation.set(0.2, 0.3, -0.2); meleeGroup.visible = false; weaponPivot.add(meleeGroup); weaponMeshes.melee = meleeGroup;
 }
 
 function updateWeaponVisibility() {
@@ -827,6 +890,7 @@ function updateWeaponVisibility() {
     weaponMeshes.rifle.visible = (currentWeapon === 'rifle');
     weaponMeshes.rocket.visible = (currentWeapon === 'rocket');
     weaponMeshes.minigun.visible = (currentWeapon === 'minigun');
+    weaponMeshes.melee.visible = (currentWeapon === 'melee');
 }
 
 function create3DHealthBar(type) {
@@ -942,6 +1006,15 @@ function syncEntitiesWith3DScene() {
         mesh.position.set(proj.x, proj.z, proj.y);
     });
 
+    thrownGrenades.forEach(g => {
+        if (!g._meshId) g._meshId = 'grenade_' + Math.random().toString(36).substr(2, 9);
+        activeMeshIds.add(g._meshId);
+        let mesh = entityMeshes.get(g._meshId);
+        if (!mesh) { mesh = buildGrenadeMesh(g.type); scene.add(mesh); entityMeshes.set(g._meshId, mesh); }
+        mesh.position.set(g.x, g.z, g.y);
+        mesh.rotation.x += 0.2; mesh.rotation.z += 0.15;
+    });
+
     pickups.forEach(pickup => {
         if (!pickup._meshId) pickup._meshId = 'pickup_' + Math.random().toString(36).substr(2, 9);
         activeMeshIds.add(pickup._meshId);
@@ -1032,6 +1105,11 @@ function updateShopUI() {
     if (weaponsUnlocked.rocket) { rkBtn.innerText = "КУПЛЕНО"; rkBtn.disabled = true; } else { rkBtn.innerHTML = `Разблокировать [3] <br> <span>${shopCosts.rocket}</span> очков`; rkBtn.disabled = score < shopCosts.rocket; }
     const mgBtn = document.getElementById("btn-buy-minigun");
     if (weaponsUnlocked.minigun) { mgBtn.innerText = "КУПЛЕНО"; mgBtn.disabled = true; } else { mgBtn.innerHTML = `Разблокировать [4] <br> <span>${shopCosts.minigun}</span> очков`; mgBtn.disabled = score < shopCosts.minigun; }
+    document.getElementById("desc-clip").innerText = `Дробовик: ${maxShotgunClip} | Автомат: ${maxRifleClip} | Пулемет: ${maxMinigunClip}. Улучшает все сразу.`;
+    document.getElementById("cost-clipCapacity").innerText = shopCosts.clipCapacity; document.getElementById("btn-buy-clipCapacity").disabled = score < shopCosts.clipCapacity;
+    document.getElementById("cost-frag").innerText = shopCosts.frag; document.getElementById("btn-buy-frag").disabled = score < shopCosts.frag;
+    document.getElementById("cost-molotov").innerText = shopCosts.molotov; document.getElementById("btn-buy-molotov").disabled = score < shopCosts.molotov;
+    document.getElementById("cost-flash").innerText = shopCosts.flash; document.getElementById("btn-buy-flash").disabled = score < shopCosts.flash;
     document.getElementById("cost-ammo").innerText = shopCosts.ammo; document.getElementById("btn-buy-ammo").disabled = score < shopCosts.ammo;
 }
 
@@ -1049,6 +1127,19 @@ function buyUpgrade(type) {
         score -= shopCosts.rocket; weaponsUnlocked.rocket = true; showCenterMessage("Разблокирована: Ракетница [3]!");
     } else if (type === 'minigun') {
         score -= shopCosts.minigun; weaponsUnlocked.minigun = true; showCenterMessage("Разблокирован: Пулемет [4]!");
+    } else if (type === 'clipCapacity') {
+        score -= shopCosts.clipCapacity; maxShotgunClip += 1; maxRifleClip += 10; maxMinigunClip += 25;
+        shotgunClip = Math.min(maxShotgunClip, shotgunClip); rifleClip = Math.min(maxRifleClip, rifleClip); minigunClip = Math.min(maxMinigunClip, minigunClip);
+        shopCosts.clipCapacity = Math.floor(shopCosts.clipCapacity * 1.6); showCenterMessage("Куплено: Больше патронов в магазине!");
+    } else if (type === 'frag') {
+        score -= shopCosts.frag; grenadeCounts.frag += 2; shopCosts.frag = Math.floor(shopCosts.frag * 1.4);
+        showCenterMessage("Куплено: +2 Осколочные гранаты!"); updateGrenadeUi();
+    } else if (type === 'molotov') {
+        score -= shopCosts.molotov; grenadeCounts.molotov += 2; shopCosts.molotov = Math.floor(shopCosts.molotov * 1.4);
+        showCenterMessage("Куплено: +2 Коктейля Молотова!"); updateGrenadeUi();
+    } else if (type === 'flash') {
+        score -= shopCosts.flash; grenadeCounts.flash += 2; shopCosts.flash = Math.floor(shopCosts.flash * 1.4);
+        showCenterMessage("Куплено: +2 Светошумовые гранаты!"); updateGrenadeUi();
     } else if (type === 'ammo') {
         score -= shopCosts.ammo; ammo = Math.min(200, ammo + 50); showCenterMessage("Получены боеприпасы (+50)!");
     }
@@ -1070,19 +1161,29 @@ function spawnExplosion(x, y, z = 0) {
 
 function spawnEnemy(isBoss = false) {
     const settings = DIFFICULTY_SETTINGS[difficulty]; let spawned = false; let attempts = 0;
+
+    // ДИНАМИЧЕСКОЕ МАСШТАБИРОВАНИЕ ЗДОРОВЬЯ НА СЛОЖНОМ УРОВНЕ:
+    // до первого босса враги как на Лёгком, затем +50% здоровья за каждого убитого босса
+    const hardScale = 1 + 0.5 * hardBossKillCount;
+    const easyStats = DIFFICULTY_SETTINGS.EASY;
+    const creeperHp = (difficulty === 'HARD') ? Math.round(easyStats.creeperHp * hardScale) : settings.creeperHp;
+    const skeletonHp = (difficulty === 'HARD') ? Math.round(easyStats.skeletonHp * hardScale) : settings.skeletonHp;
+    const flyerHp = (difficulty === 'HARD') ? Math.round(easyStats.flyerHp * hardScale) : settings.flyerHp;
+    const bossHpValue = (difficulty === 'HARD') ? Math.round(settings.bossHp * hardScale) : settings.bossHp;
+
     while (!spawned && attempts < 150) {
         attempts++; let rx = Math.floor(Math.random() * mapSize); let ry = Math.floor(Math.random() * mapSize);
         if (map[ry * mapSize + rx] === 0 && Math.hypot(rx - playerX, ry - playerY) > 6) {
             if (isBoss) {
-                const bossHp = settings.bossHp;
+                const bossHp = bossHpValue;
                 enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: 'boss', health: bossHp, maxHealth: bossHp, speed: 2.1, size: 1.3, isFlying: settings.flyingBoss, hoverPhase: Math.random() * Math.PI * 2 });
                 hasBoss = true; bossUi.style.display = "block"; bossHpUi.innerText = bossHp;
             } else {
                 let type;
                 if (settings.flyingEnemies) { const r = Math.random(); type = r < 0.34 ? 'creeper' : (r < 0.67 ? 'skeleton' : 'flyer'); } else { type = Math.random() > 0.5 ? 'creeper' : 'skeleton'; }
-                if (type === 'creeper') { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: settings.creeperHp, maxHealth: settings.creeperHp, speed: 1.6, size: 0.45 }); }
-                else if (type === 'skeleton') { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: settings.skeletonHp, maxHealth: settings.skeletonHp, speed: 1.2, size: 0.45 }); }
-                else { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0.9, type: type, health: settings.flyerHp, maxHealth: settings.flyerHp, speed: 2.0, size: 0.4, isFlying: true, hoverPhase: Math.random() * Math.PI * 2 }); }
+                if (type === 'creeper') { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: creeperHp, maxHealth: creeperHp, speed: 1.6, size: 0.45 }); }
+                else if (type === 'skeleton') { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: skeletonHp, maxHealth: skeletonHp, speed: 1.2, size: 0.45 }); }
+                else { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0.9, type: type, health: flyerHp, maxHealth: flyerHp, speed: 2.0, size: 0.4, isFlying: true, hoverPhase: Math.random() * Math.PI * 2 }); }
             }
             spawned = true;
         }
@@ -1114,11 +1215,13 @@ function attemptMultiplayerConnect() {
     connectMultiplayer(url, room, name, chosenDifficulty,
         (spawnX, spawnY) => {
             statusEl.innerText = ''; playerX = spawnX; playerY = spawnY; playerAngle = 0.0; playerPitch = 0.0;
-            playerZ = 0; playerVelZ = 0; isOnGround = true; health = 100; maxHealth = 100; score = 0; ammo = 100; shotgunClip = 2; rifleClip = 30; minigunClip = 100;
+            playerZ = 0; playerVelZ = 0; isOnGround = true; health = 100; maxHealth = 100; score = 0; ammo = 100;
+            maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; shotgunClip = 2; rifleClip = 30; minigunClip = 100;
             currentWeapon = 'shotgun'; rocketLoaded = true; weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false };
+            grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = []; meleeCooldownTimer = 0;
             enemies = []; projectiles = []; particles = []; pickups = [];
             healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)";
-            updateWeaponVisibility(); initAudio(); document.getElementById("start-overlay").style.display = 'none';
+            updateGrenadeUi(); updateWeaponVisibility(); initAudio(); document.getElementById("start-overlay").style.display = 'none';
             gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
         },
         (errorMsg) => { statusEl.style.color = '#ff8080'; statusEl.innerText = errorMsg; }
@@ -1136,7 +1239,7 @@ function startGame(chosenDifficulty) {
     const spawn = findOpenSpawnCell(3, 3);
     playerX = spawn.x; playerY = spawn.y; playerAngle = 0.0; playerPitch = 0.0;
     initAudio(); document.getElementById("start-overlay").style.display = 'none';
-    gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
+    updateGrenadeUi(); gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
 }
 
 function updateDifficultyUi() {
@@ -1147,21 +1250,25 @@ function updateDifficultyUi() {
 function restartGame() {
     if (multiplayer.enabled) {
         if (multiplayer.ws && multiplayer.ws.readyState === WebSocket.OPEN) multiplayer.ws.send(JSON.stringify({ type: 'respawn' }));
-        playerZ = 0; playerVelZ = 0; isOnGround = true; ammo = 100; shotgunClip = 2; rifleClip = 30; minigunClip = 100; isReloading = false; reloadTimer = 0;
+        playerZ = 0; playerVelZ = 0; isOnGround = true; ammo = 100; shotgunClip = maxShotgunClip; rifleClip = maxRifleClip; minigunClip = maxMinigunClip; isReloading = false; reloadTimer = 0; meleeCooldownTimer = 0;
+        thrownGrenades = []; fireZones = [];
         projectiles = []; particles = []; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
-        ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)"; reloadUi.innerText = ""; gameState = 'PLAYING'; canvas.requestPointerLock();
+        ammoUi.innerText = ammo; weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`; reloadUi.innerText = ""; gameState = 'PLAYING'; canvas.requestPointerLock();
         return;
     }
     const spawn = findOpenSpawnCell(3, 3);
     playerX = spawn.x; playerY = spawn.y; playerAngle = 0.0; playerPitch = 0.0; playerZ = 0; playerVelZ = 0; isOnGround = true;
-    health = 100; maxHealth = 100; damageMultiplier = 1.0; score = 0; ammo = 100; shotgunClip = 2; rifleClip = 30; minigunClip = 100;
-    currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadTimer = 0;
-    weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false }; shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150 };
+    health = 100; maxHealth = 100; damageMultiplier = 1.0; score = 0; ammo = 100;
+    maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; shotgunClip = 2; rifleClip = 30; minigunClip = 100;
+    currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadTimer = 0; meleeCooldownTimer = 0; hardBossKillCount = 0;
+    weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false };
+    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300 };
+    grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
     enemies = []; projectiles = []; particles = []; pickups = [];
     bossUi.style.display = "none"; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
     for(let i = 0; i < 7; i++) spawnEnemy(false);
     healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)"; reloadUi.innerText = "";
-    updateWeaponVisibility(); gameState = 'PLAYING'; initAudio(); updateDifficultyUi(); canvas.requestPointerLock();
+    updateGrenadeUi(); updateWeaponVisibility(); gameState = 'PLAYING'; initAudio(); updateDifficultyUi(); canvas.requestPointerLock();
 }
 
 for(let i = 0; i < 7; i++) spawnEnemy(false);
@@ -1174,13 +1281,13 @@ window.addEventListener('keydown', e => {
     
     if (e.code === 'Digit1') { 
         currentWeapon = 'shotgun'; 
-        weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/2)`; 
+        weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`; 
         reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; 
         updateWeaponVisibility();
     }
     if (e.code === 'Digit2') { 
         if (weaponsUnlocked.rifle) {
-            currentWeapon = 'rifle'; weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/30)`; reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
+            currentWeapon = 'rifle'; weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/${maxRifleClip})`; reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
         } else { showCenterMessage("ЗАБЛОКИРОВАНО! Купите Автомат в магазине (E)"); }
     }
     if (e.code === 'Digit3') { 
@@ -1190,8 +1297,11 @@ window.addEventListener('keydown', e => {
     }
     if (e.code === 'Digit4') { 
         if (weaponsUnlocked.minigun) {
-            currentWeapon = 'minigun'; weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/100)`; reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
+            currentWeapon = 'minigun'; weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`; reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
         } else { showCenterMessage("ЗАБЛОКИРОВАНО! Купите Пулемет в магазине (E)"); }
+    }
+    if (e.code === 'KeyM') {
+        currentWeapon = 'melee'; weaponUi.innerText = `НОЖ [M]`; reloadUi.innerText = ""; updateWeaponVisibility();
     }
     if (e.code === 'Space') {
         if (isOnGround) { playerVelZ = JUMP_VELOCITY; isOnGround = false; }
@@ -1199,10 +1309,13 @@ window.addEventListener('keydown', e => {
     }
     // РУЧНАЯ ПЕРЕЗАРЯДКА НА R ДЛЯ ДРОБОВИКА, АВТОМАТА И ПУЛЕМЕТА
     if (e.code === 'KeyR' && !isReloading && ammo > 0) {
-        if (currentWeapon === 'shotgun' && shotgunClip < 2) startShotgunReload();
-        if (currentWeapon === 'rifle' && rifleClip < 30) startRifleReload();
-        if (currentWeapon === 'minigun' && minigunClip < 100) startMinigunReload();
+        if (currentWeapon === 'shotgun' && shotgunClip < maxShotgunClip) startShotgunReload();
+        if (currentWeapon === 'rifle' && rifleClip < maxRifleClip) startRifleReload();
+        if (currentWeapon === 'minigun' && minigunClip < maxMinigunClip) startMinigunReload();
     }
+    // G - СМЕНА ТИПА ГРАНАТЫ, Q - БРОСОК ГРАНАТЫ
+    if (e.code === 'KeyG') { cycleGrenadeType(); }
+    if (e.code === 'KeyQ') { throwGrenade(); }
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
@@ -1232,27 +1345,112 @@ function triggerMuzzleFlash() {
     muzzleFlashTimer = MUZZLE_FLASH_DURATION;
 }
 
+function updateGrenadeUi() {
+    const el = document.getElementById("grenade-val");
+    if (!el) return;
+    const names = { frag: 'ГРАНАТА', molotov: 'МОЛОТОВ', flash: 'СВЕТОШУМОВАЯ' };
+    el.innerText = `${names[currentGrenadeType]} (${grenadeCounts[currentGrenadeType]}) [Q]`;
+}
+
+function cycleGrenadeType() {
+    const i = GRENADE_TYPES_ORDER.indexOf(currentGrenadeType);
+    currentGrenadeType = GRENADE_TYPES_ORDER[(i + 1) % GRENADE_TYPES_ORDER.length];
+    updateGrenadeUi();
+    showCenterMessage(`Граната: ${currentGrenadeType === 'frag' ? 'Осколочная' : (currentGrenadeType === 'molotov' ? 'Молотов' : 'Светошумовая')}`);
+}
+
+function throwGrenade() {
+    if (gameState !== 'PLAYING' || health <= 0) return;
+    if (grenadeCounts[currentGrenadeType] <= 0) { showCenterMessage("Нет гранат этого типа!"); return; }
+    grenadeCounts[currentGrenadeType]--;
+    updateGrenadeUi();
+    thrownGrenades.push({
+        x: playerX + Math.cos(playerAngle) * 0.5, y: playerY + Math.sin(playerAngle) * 0.5, z: playerZ + 0.6,
+        vx: Math.cos(playerAngle) * 9.0, vy: Math.sin(playerAngle) * 9.0, vz: 3.5,
+        fuse: 1.7, type: currentGrenadeType
+    });
+    playRocketLaunchSound();
+}
+
+function detonateGrenade(g) {
+    if (g.type === 'frag') {
+        spawnExplosion(g.x, g.y, g.z);
+        applyAoeDamage(g.x, g.y, FRAG_RADIUS, BASE_FRAG_DAMAGE * damageMultiplier, true);
+    } else if (g.type === 'molotov') {
+        spawnExplosion(g.x, g.y, g.z);
+        fireZones.push({ x: g.x, y: g.y, radius: MOLOTOV_RADIUS, duration: MOLOTOV_DURATION, particleTimer: 0 });
+    } else if (g.type === 'flash') {
+        spawnExplosion(g.x, g.y, g.z);
+        enemies.forEach(enemy => {
+            if (Math.hypot(enemy.x - g.x, enemy.y - g.y) < FLASH_RADIUS) {
+                enemy.stunTimer = Math.max(enemy.stunTimer || 0, FLASH_STUN_DURATION);
+            }
+        });
+        if (Math.hypot(playerX - g.x, playerY - g.y) < FLASH_RADIUS) {
+            triggerFlashOverlay();
+        }
+    }
+}
+
+function applyAoeDamage(ex, ey, radius, dmg, includePlayer) {
+    enemies.forEach(enemy => {
+        let dist = Math.hypot(enemy.x - ex, enemy.y - ey);
+        if (dist < radius) {
+            let falloff = 1.0 - (dist / radius); let currentDmg = dmg * falloff;
+            enemy.health -= currentDmg; spawnBlood(enemy.x, enemy.y, currentDmg / 3);
+            if (enemy.type === 'boss') bossHpUi.innerText = Math.max(0, Math.floor(enemy.health));
+            if (multiplayer.enabled && enemy.id) sendNetworkHit(enemy.id, currentDmg);
+        }
+    });
+    if (includePlayer) {
+        let distToPlayer = Math.hypot(playerX - ex, playerY - ey);
+        if (distToPlayer < radius) {
+            let falloff = 1.0 - (distToPlayer / radius);
+            health = Math.max(0, health - Math.floor(dmg * 0.6 * falloff)); healthUi.innerText = health;
+            addDamageIndicator(Math.atan2(ey - playerY, ex - playerX)); playHurtSound();
+        }
+    }
+}
+
+let flashOverlayTimer = 0;
+function triggerFlashOverlay() { flashOverlayTimer = 1.2; }
+
+function buildGrenadeMesh(type) {
+    if (type === 'frag') {
+        return new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshLambertMaterial({ color: 0x2f3d2a }));
+    } else if (type === 'molotov') {
+        const group = new THREE.Group();
+        const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.14, 8), new THREE.MeshLambertMaterial({ color: 0x5a3a1a, transparent: true, opacity: 0.85 }));
+        group.add(bottle);
+        const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.06, 8), new THREE.MeshBasicMaterial({ color: 0xff6600 }));
+        liquid.position.y = -0.02; group.add(liquid);
+        return group;
+    } else {
+        return new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.13, 8), new THREE.MeshLambertMaterial({ color: 0xcccccc }));
+    }
+}
+
 function executeShot() {
     if (health <= 0 || gameState !== 'PLAYING') return;
     if (currentWeapon === 'shotgun') {
-        // УЛУЧШЕННЫЙ ДРОБОВИК: проверка магазина на 2 патрона и увеличенный урон
+        // УЛУЧШЕННЫЙ ДРОБОВИК: проверка магазина и увеличенный урон
         if (!isReloading && shotgunClip > 0 && !isShooting && ammo > 0) {
             isShooting = true; shootTimer = 0; shotgunClip--; ammo--;
-            ammoUi.innerText = ammo; weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/2)`;
+            ammoUi.innerText = ammo; weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`;
             playShotgunSound(); triggerMuzzleFlash(); checkHit(0.18, BASE_SHOTGUN_DAMAGE * damageMultiplier);
             if (shotgunClip <= 0 && ammo > 0) startShotgunReload();
         }
     } else if (currentWeapon === 'rifle') {
         if (!isReloading && rifleClip > 0 && ammo > 0 && rifleFireRateTimer <= 0) {
             isShooting = true; shootTimer = 0; rifleClip--; ammo--;
-            ammoUi.innerText = ammo; weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/30)`;
+            ammoUi.innerText = ammo; weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/${maxRifleClip})`;
             rifleFireRateTimer = 0.12; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.06, BASE_RIFLE_DAMAGE * damageMultiplier);
             if (rifleClip <= 0 && ammo > 0) startRifleReload();
         }
     } else if (currentWeapon === 'minigun') {
         if (!isReloading && minigunClip > 0 && ammo > 0 && minigunFireRateTimer <= 0) {
             isShooting = true; shootTimer = 0; minigunClip--; ammo--;
-            ammoUi.innerText = ammo; weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/100)`;
+            ammoUi.innerText = ammo; weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`;
             minigunFireRateTimer = 0.05; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.07, BASE_MINIGUN_DAMAGE * damageMultiplier);
             if (minigunClip <= 0 && ammo > 0) startMinigunReload();
         }
@@ -1262,6 +1460,11 @@ function executeShot() {
             reloadUi.innerText = "(ЗАРЯЖАЕТСЯ...)"; playRocketLaunchSound(); triggerMuzzleFlash();
             projectiles.push({ x: playerX + Math.cos(playerAngle) * 0.5, y: playerY + Math.sin(playerAngle) * 0.5, z: playerZ + 0.5, vx: Math.cos(playerAngle) * 12.0, vy: Math.sin(playerAngle) * 12.0, vz: playerPitch * 8.0, damage: BASE_ROCKET_DAMAGE * damageMultiplier });
             if (currentWeapon === 'rocket') weaponUi.innerText = `РАКЕТНИЦА [3] (ПЕРЕЗАРЯДКА)`;
+        }
+    } else if (currentWeapon === 'melee') {
+        if (meleeCooldownTimer <= 0) {
+            isShooting = true; shootTimer = 0; meleeCooldownTimer = MELEE_COOLDOWN;
+            playShotgunSound(); checkHit(0.35, BASE_MELEE_DAMAGE * damageMultiplier, MELEE_RANGE);
         }
     }
 }
@@ -1276,7 +1479,8 @@ function startMinigunReload() {
     isReloading = true; reloadTimer = 2.6; reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)"; playReloadSound();
 }
 
-function checkHit(fovSpread, damage) {
+function checkHit(fovSpread, damage, maxRange) {
+    maxRange = maxRange || Infinity;
     const rayAngle = playerAngle; let hitTarget = null; let minEnemyDist = Infinity;
     function hasLineOfSight(enemy) {
         const dx = enemy.x - playerX; const dy = enemy.y - playerY; const dist = Math.hypot(dx, dy);
@@ -1298,7 +1502,7 @@ function checkHit(fovSpread, damage) {
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2; while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         if (angleDiff < fovSpread || angleDiff > Math.PI * 2 - fovSpread) {
             let dist = Math.hypot(enemy.x - playerX, enemy.y - playerY);
-            if (dist < minEnemyDist && hasLineOfSight(enemy)) { minEnemyDist = dist; hitTarget = enemy; }
+            if (dist <= maxRange && dist < minEnemyDist && hasLineOfSight(enemy)) { minEnemyDist = dist; hitTarget = enemy; }
         }
     });
 
@@ -1342,6 +1546,7 @@ function update(dt) {
 
     if (rifleFireRateTimer > 0) rifleFireRateTimer -= dt;
     if (minigunFireRateTimer > 0) minigunFireRateTimer -= dt;
+    if (meleeCooldownTimer > 0) meleeCooldownTimer -= dt;
     if (isShooting) { shootTimer += dt * 16; if (shootTimer > 4) isShooting = false; }
     walkCycle += isMoving ? dt * 11 : 0;
 
@@ -1358,14 +1563,14 @@ function update(dt) {
         if (reloadTimer <= 0) {
             isReloading = false; reloadUi.innerText = "";
             if (currentWeapon === 'shotgun') {
-                shotgunClip = Math.min(2, ammo);
-                weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/2)`;
+                shotgunClip = Math.min(maxShotgunClip, ammo);
+                weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`;
             } else if (currentWeapon === 'rifle') {
-                rifleClip = Math.min(30, ammo);
-                weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/30)`;
+                rifleClip = Math.min(maxRifleClip, ammo);
+                weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/${maxRifleClip})`;
             } else if (currentWeapon === 'minigun') {
-                minigunClip = Math.min(100, ammo);
-                weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/100)`;
+                minigunClip = Math.min(maxMinigunClip, ammo);
+                weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`;
             }
         }
     }
@@ -1411,6 +1616,78 @@ function update(dt) {
         }
     }
 
+    // ПРОВЕРКА ЛИНИИ ОГНЯ ОТ ВРАГА К ИГРОКУ (для скелетов-стрелков)
+    function enemyHasLineOfSight(enemy) {
+        const dx = playerX - enemy.x; const dy = playerY - enemy.y; const dist = Math.hypot(dx, dy);
+        const steps = Math.max(6, Math.floor(dist / 0.25)); const stepX = dx / steps; const stepY = dy / steps;
+        let cx = enemy.x; let cy = enemy.y;
+        for (let i = 0; i < steps; i++) {
+            cx += stepX; cy += stepY;
+            const cellX = Math.floor(cx); const cellY = Math.floor(cy);
+            if (cellX < 0 || cellX >= mapSize || cellY < 0 || cellY >= mapSize) return false;
+            if (map[cellY * mapSize + cellX] > 0) return false;
+        }
+        return true;
+    }
+
+    // СНАРЯДЫ ВРАГОВ (плазменные болты скелетов-стрелков)
+    if (!multiplayer.enabled) {
+        enemyProjectiles = enemyProjectiles.filter(p => {
+            p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+            let cx = Math.floor(p.x); let cy = Math.floor(p.y);
+            if (cx < 0 || cx >= mapSize || cy < 0 || cy >= mapSize || map[cy * mapSize + cx] > 0) return false;
+            if (p.life <= 0) return false;
+            if (Math.hypot(playerX - p.x, playerY - p.y) < 0.45) {
+                health = Math.max(0, health - p.damage); healthUi.innerText = health;
+                addDamageIndicator(Math.atan2(p.y - playerY, p.x - playerX));
+                spawnBlood(playerX, playerY, 3);
+                if (Math.random() < 0.4) playHurtSound();
+                return false;
+            }
+            return true;
+        });
+    }
+
+    // ФИЗИКА БРОШЕННЫХ ГРАНАТ (полёт по дуге под гравитацией, взрыв при касании земли/стены/по таймеру)
+    if (!multiplayer.enabled) {
+        thrownGrenades = thrownGrenades.filter(g => {
+            g.vz -= GRAVITY * dt;
+            const nx = g.x + g.vx * dt; const ny = g.y + g.vy * dt;
+            g.z += g.vz * dt; g.fuse -= dt;
+            const cx = Math.floor(nx); const cy = Math.floor(ny);
+            const hitWall = cx < 0 || cx >= mapSize || cy < 0 || cy >= mapSize || map[cy * mapSize + cx] > 0;
+            if (!hitWall) { g.x = nx; g.y = ny; } else { g.vx *= -0.3; g.vy *= -0.3; }
+            if (g.z <= 0.05) { g.z = 0.05; detonateGrenade(g); return false; }
+            if (g.fuse <= 0) { detonateGrenade(g); return false; }
+            return true;
+        });
+
+        // ОГНЕННЫЕ ЗОНЫ ОТ КОКТЕЙЛЯ МОЛОТОВА (урон по времени)
+        fireZones = fireZones.filter(fz => {
+            fz.duration -= dt; fz.particleTimer -= dt;
+            if (fz.particleTimer <= 0) {
+                fz.particleTimer = 0.12;
+                spawnBlood(fz.x + (Math.random() - 0.5) * fz.radius, fz.y + (Math.random() - 0.5) * fz.radius, 1);
+            }
+            enemies.forEach(enemy => {
+                if (Math.hypot(enemy.x - fz.x, enemy.y - fz.y) < fz.radius) {
+                    enemy.health -= MOLOTOV_TICK_DAMAGE * dt;
+                    if (enemy.type === 'boss') bossHpUi.innerText = Math.max(0, Math.floor(enemy.health));
+                }
+            });
+            if (Math.hypot(playerX - fz.x, playerY - fz.y) < fz.radius) {
+                health = Math.max(0, health - MOLOTOV_TICK_DAMAGE * dt); healthUi.innerText = Math.floor(health);
+            }
+            return fz.duration > 0;
+        });
+    }
+
+    if (flashOverlayTimer > 0) {
+        flashOverlayTimer -= dt;
+        const el = document.getElementById("flash-overlay");
+        if (el) el.style.opacity = Math.max(0, flashOverlayTimer / 1.2) * 0.9;
+    }
+
     pickups = pickups.filter(p => {
         if (Math.hypot(playerX - p.x, playerY - p.y) < 0.6) {
             playPickupSound();
@@ -1438,9 +1715,18 @@ function update(dt) {
         enemies = enemies.filter(enemy => {
             if (enemy.health <= 0) {
                 spawnPickup(enemy.x, enemy.y);
-                if (enemy.type === 'boss') { score += 2500; hasBoss = false; bossUi.style.display = "none"; }
+                if (enemy.type === 'boss') {
+                    score += 2500; hasBoss = false; bossUi.style.display = "none";
+                    if (difficulty === 'HARD') hardBossKillCount++; // ДИНАМИЧЕСКОЕ МАСШТАБИРОВАНИЕ ЗДОРОВЬЯ
+                }
                 else { score += enemy.type === 'creeper' ? 100 : 150; }
                 scoreUi.innerText = score; return false;
+            }
+
+            // СВЕТОШУМОВАЯ ГРАНАТА: враг оглушён - не двигается и не атакует
+            if (enemy.stunTimer > 0) {
+                enemy.stunTimer -= dt;
+                return true;
             }
 
             if (enemy.isFlying) {
@@ -1543,16 +1829,18 @@ function render3D() {
     camera.lookAt(new THREE.Vector3(lookX, lookY, lookZ));
     let swayX = 0; let swayY = 0;
     if (isMoving && !isShooting) { swayX = Math.sin(walkCycle) * 0.012; swayY = Math.abs(Math.cos(walkCycle)) * 0.008; }
-    let recoilZ = 0; let recoilY = 0;
+    let recoilZ = 0; let recoilY = 0; let meleeSwing = 0;
     if (isShooting) {
         if (currentWeapon === 'shotgun') { recoilZ = (shootTimer < 1.8) ? 0.09 : -0.03; recoilY = (shootTimer < 1.8) ? 0.04 : -0.01; }
         else if (currentWeapon === 'rifle') { recoilZ = Math.sin(shootTimer * 4.5) * 0.02; recoilY = Math.sin(shootTimer * 4.5) * 0.005; }
         else if (currentWeapon === 'minigun') { recoilZ = Math.sin(shootTimer * 8) * 0.015; recoilY = Math.sin(shootTimer * 8) * 0.004; }
+        else if (currentWeapon === 'melee') { meleeSwing = Math.sin(Math.min(shootTimer, 1.4) * 4.5) * 1.1; }
         else { recoilZ = Math.sin(shootTimer * 3) * 0.06; recoilY = Math.sin(shootTimer * 3) * 0.02; }
     }
     if (weaponMeshes.minigunBarrels) {
         weaponMeshes.minigunBarrels.rotation.z += (currentWeapon === 'minigun' && isShooting ? 0.9 : 0.08);
     }
+    if (weaponMeshes.melee) { weaponMeshes.melee.rotation.set(0.2 - meleeSwing * 0.5, 0.3 + meleeSwing, -0.2); }
     weaponPivot.position.set(swayX, (isReloading ? -0.3 : 0) + recoilY, recoilZ);
     syncEntitiesWith3DScene(); renderer.render(scene, camera);
 }
