@@ -229,10 +229,30 @@
                <b>Цифры 1, 2, 3</b> — Смена оружия (автомат и ракетницу нужно сначала купить)
             </p>
             <p style="color:#e0aaff; margin-bottom:8px;">Выберите сложность:</p>
-            <div style="display:flex; gap:12px; margin-bottom:8px;">
+            <div style="display:flex; gap:12px; margin-bottom:14px;">
                 <button class="btn" style="background:#2b6b2b; box-shadow:0 5px 0 #164016; font-size:16px; padding:10px 22px;" onclick="startGame('EASY')">ЛЕГКО</button>
                 <button class="btn" style="background:#b38600; box-shadow:0 5px 0 #664c00; font-size:16px; padding:10px 22px;" onclick="startGame('MEDIUM')">СРЕДНЕ</button>
                 <button class="btn" style="background:#ff2a2a; box-shadow:0 5px 0 #990000; font-size:16px; padding:10px 22px;" onclick="startGame('HARD')">СЛОЖНО</button>
+            </div>
+
+            <div style="border-top:1px solid rgba(255,255,255,0.15); padding-top:12px; width:100%; max-width:360px;">
+                <button class="btn" style="background:#333; box-shadow:0 5px 0 #111; font-size:14px; padding:8px 18px;" onclick="toggleMpPanel()">МУЛЬТИПЛЕЕР (СОВМЕСТНЫЙ РЕЖИМ)</button>
+                <div id="mp-panel" style="display:none; margin-top:12px; text-align:left;">
+                    <label style="font-size:12px; color:#bbb;">Адрес сервера (ws:// или wss://)</label>
+                    <input id="mp-url" type="text" placeholder="wss://your-server.onrender.com" style="width:100%; padding:8px; margin:4px 0 8px; border-radius:6px; border:1px solid #555; background:#111; color:#fff;">
+                    <label style="font-size:12px; color:#bbb;">Код комнаты</label>
+                    <input id="mp-room" type="text" placeholder="Например: FRIENDS1" style="width:100%; padding:8px; margin:4px 0 8px; border-radius:6px; border:1px solid #555; background:#111; color:#fff;">
+                    <label style="font-size:12px; color:#bbb;">Ваше имя</label>
+                    <input id="mp-name" type="text" placeholder="Игрок" style="width:100%; padding:8px; margin:4px 0 8px; border-radius:6px; border:1px solid #555; background:#111; color:#fff;">
+                    <p style="font-size:11px; color:#888; margin:4px 0 10px;">Сложность (учитывается только при создании новой комнаты):</p>
+                    <select id="mp-difficulty" style="width:100%; padding:8px; margin-bottom:10px; border-radius:6px; border:1px solid #555; background:#111; color:#fff;">
+                        <option value="EASY">ЛЕГКО</option>
+                        <option value="MEDIUM">СРЕДНЕ</option>
+                        <option value="HARD">СЛОЖНО</option>
+                    </select>
+                    <button class="btn" style="background:#1f7a4d; box-shadow:0 5px 0 #0e4a2c; width:100%; font-size:14px; padding:10px;" onclick="attemptMultiplayerConnect()">ПОДКЛЮЧИТЬСЯ И ИГРАТЬ</button>
+                    <p id="mp-status" style="font-size:12px; color:#ff8080; margin-top:8px; min-height:16px;"></p>
+                </div>
             </div>
         </div>
 
@@ -373,6 +393,110 @@ const DIFFICULTY_SETTINGS = {
     HARD:   { label: "СЛОЖНО",spawnInterval: 10, creeperHp: 500, skeletonHp: 500, flyerHp: 500, bossHp: 5000, flyingEnemies: true,  flyingBoss: true  }
 };
 let difficulty = 'EASY';
+
+// === МУЛЬТИПЛЕЕР (клиент) ===
+const multiplayer = {
+    enabled: false,
+    ws: null,
+    myId: null,
+    players: {},       // id -> { x, y, angle, health, score, alive, color, name }
+    inputSendTimer: 0
+};
+
+function connectMultiplayer(serverUrl, roomCode, playerName, chosenDifficulty, onReady, onError) {
+    let ws;
+    try {
+        ws = new WebSocket(serverUrl);
+    } catch (e) {
+        onError('Не удалось создать подключение: ' + e.message);
+        return;
+    }
+
+    const connectTimeout = setTimeout(() => {
+        onError('Сервер не отвечает. Проверьте адрес и попробуйте снова.');
+        try { ws.close(); } catch (e) {}
+    }, 8000);
+
+    ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'join', room: roomCode || 'default', name: playerName || 'Игрок', difficulty: chosenDifficulty }));
+    };
+
+    ws.onmessage = (event) => {
+        let msg;
+        try { msg = JSON.parse(event.data); } catch (e) { return; }
+
+        if (msg.type === 'joined') {
+            clearTimeout(connectTimeout);
+            multiplayer.myId = msg.id;
+            multiplayer.enabled = true;
+            multiplayer.ws = ws;
+            difficulty = msg.difficulty;
+            onReady(msg.x, msg.y);
+        } else if (msg.type === 'state') {
+            const newEnemies = msg.enemies.map(e => ({
+                id: e.id, type: e.type, x: e.x, y: e.y, z: e.z || 0,
+                health: e.hp, maxHealth: e.maxHp, size: e.type === 'boss' ? 1.3 : 0.45,
+                isFlying: e.isFlying
+            }));
+            enemies = newEnemies;
+
+            multiplayer.players = {};
+            let me = null;
+            msg.players.forEach(p => {
+                multiplayer.players[p.id] = p;
+                if (p.id === multiplayer.myId) me = p;
+            });
+
+            const bossEntry = msg.enemies.find(e => e.type === 'boss');
+            if (bossEntry) {
+                hasBoss = true;
+                bossUi.style.display = 'block';
+                bossHpUi.innerText = Math.max(0, Math.floor(bossEntry.hp));
+            } else {
+                hasBoss = false;
+                bossUi.style.display = 'none';
+            }
+
+            if (me) {
+                health = Math.max(0, Math.floor(me.health));
+                healthUi.innerText = health;
+                score = me.score;
+                scoreUi.innerText = score;
+                if (!me.alive && gameState === 'PLAYING') {
+                    gameState = 'GAMEOVER';
+                    document.getElementById("death-stats").innerHTML = `Ваш финальный счет: <span style="color:yellow; font-size:24px;">${score}</span> очков!`;
+                    document.getElementById("death-overlay").style.display = 'flex';
+                    document.exitPointerLock();
+                }
+            }
+        } else if (msg.type === 'enemyDied') {
+            spawnPickup(msg.x, msg.y);
+        } else if (msg.type === 'playerLeft') {
+            delete multiplayer.players[msg.id];
+        } else if (msg.type === 'youDied') {
+            // handled via state sync (alive flag)
+        }
+    };
+
+    ws.onerror = () => {
+        clearTimeout(connectTimeout);
+        onError('Ошибка подключения к серверу.');
+    };
+
+    ws.onclose = () => {
+        clearTimeout(connectTimeout);
+        if (multiplayer.enabled) {
+            multiplayer.enabled = false;
+            showCenterMessage('Соединение с сервером потеряно');
+        }
+    };
+}
+
+function sendNetworkHit(enemyId, damage) {
+    if (multiplayer.enabled && multiplayer.ws && multiplayer.ws.readyState === WebSocket.OPEN) {
+        multiplayer.ws.send(JSON.stringify({ type: 'hit', enemyId, damage }));
+    }
+}
 
 // Оружие и Прогресс Магазина
 let weaponsUnlocked = {
@@ -757,6 +881,10 @@ function toggleAudio() {
 // === СИСТЕМА МАГАЗИНА УЛУЧШЕНИЙ ===
 function toggleShop() {
     if (gameState === 'START' || gameState === 'GAMEOVER') return;
+    if (multiplayer.enabled) {
+        showCenterMessage('Магазин недоступен в совместном режиме');
+        return;
+    }
     
     if (gameState === 'PLAYING') {
         gameState = 'SHOP';
@@ -954,7 +1082,72 @@ function spawnPickup(x, y) {
     });
 }
 
+function toggleMpPanel() {
+    const panel = document.getElementById("mp-panel");
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function attemptMultiplayerConnect() {
+    const url = document.getElementById("mp-url").value.trim();
+    const room = document.getElementById("mp-room").value.trim();
+    const name = document.getElementById("mp-name").value.trim();
+    const chosenDifficulty = document.getElementById("mp-difficulty").value;
+    const statusEl = document.getElementById("mp-status");
+
+    if (!url) {
+        statusEl.style.color = '#ff8080';
+        statusEl.innerText = 'Укажите адрес сервера.';
+        return;
+    }
+
+    statusEl.style.color = '#ffd23a';
+    statusEl.innerText = 'Подключение...';
+
+    connectMultiplayer(url, room, name, chosenDifficulty,
+        (spawnX, spawnY) => {
+            statusEl.innerText = '';
+            playerX = spawnX;
+            playerY = spawnY;
+            playerAngle = 0.0;
+            playerPitch = 0.0;
+            playerZ = 0;
+            playerVelZ = 0;
+            isOnGround = true;
+            health = 100;
+            maxHealth = 100;
+            score = 0;
+            ammo = 100;
+            rifleClip = 30;
+            currentWeapon = 'shotgun';
+            rocketLoaded = true;
+            weaponsUnlocked = { shotgun: true, rifle: false, rocket: false };
+            enemies = [];
+            projectiles = [];
+            particles = [];
+            pickups = [];
+            damageIndicators = [];
+            healthUi.innerText = health;
+            scoreUi.innerText = score;
+            ammoUi.innerText = ammo;
+            weaponUi.innerText = "ДРОБОВИК [1]";
+            initAudio();
+            document.getElementById("start-overlay").style.display = 'none';
+            gameState = 'PLAYING';
+            startBackgroundMusic();
+            updateDifficultyUi();
+            canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;
+            canvas.requestPointerLock();
+        },
+        (errorMsg) => {
+            statusEl.style.color = '#ff8080';
+            statusEl.innerText = errorMsg;
+        }
+    );
+}
+
 function startGame(chosenDifficulty) {
+    multiplayer.enabled = false;
+    if (multiplayer.ws) { try { multiplayer.ws.close(); } catch (e) {} multiplayer.ws = null; }
     if (chosenDifficulty) difficulty = chosenDifficulty;
     initAudio();
     document.getElementById("start-overlay").style.display = 'none';
@@ -968,10 +1161,36 @@ function startGame(chosenDifficulty) {
 function updateDifficultyUi() {
     const label = DIFFICULTY_SETTINGS[difficulty].label;
     const el = document.getElementById("difficulty-val");
-    if (el) el.innerText = label;
+    if (el) el.innerText = label + (multiplayer.enabled ? ' (СЕТЬ)' : '');
 }
 
 function restartGame() {
+    if (multiplayer.enabled) {
+        // Совместный режим: возрождение через сервер, счёт и враги общие для комнаты
+        if (multiplayer.ws && multiplayer.ws.readyState === WebSocket.OPEN) {
+            multiplayer.ws.send(JSON.stringify({ type: 'respawn' }));
+        }
+        playerZ = 0;
+        playerVelZ = 0;
+        isOnGround = true;
+        ammo = 100;
+        rifleClip = 30;
+        isReloading = false;
+        reloadTimer = 0;
+        projectiles = [];
+        particles = [];
+        damageIndicators = [];
+        screenShake = 0;
+        document.getElementById("death-overlay").style.display = 'none';
+        document.getElementById("shop-overlay").style.display = 'none';
+        ammoUi.innerText = ammo;
+        weaponUi.innerText = "ДРОБОВИК [1]";
+        reloadUi.innerText = "";
+        gameState = 'PLAYING';
+        canvas.requestPointerLock();
+        return;
+    }
+
     playerX = 3.5;
     playerY = 3.5;
     playerAngle = 0.0;
@@ -1223,6 +1442,9 @@ function checkHit(fovSpread, damage) {
         }
         hitTarget.x -= Math.cos(playerAngle) * 0.12;
         hitTarget.y -= Math.sin(playerAngle) * 0.12;
+        if (multiplayer.enabled && hitTarget.id) {
+            sendNetworkHit(hitTarget.id, damage);
+        }
     }
 }
 
@@ -1365,6 +1587,9 @@ function update(dt) {
                 if (enemy.type === 'boss') {
                     bossHpUi.innerText = Math.max(0, Math.floor(enemy.health));
                 }
+                if (multiplayer.enabled && enemy.id) {
+                    sendNetworkHit(enemy.id, currentDmg);
+                }
             }
         });
         
@@ -1416,74 +1641,85 @@ function update(dt) {
         return indicator.time < indicator.maxTime;
     });
 
-    regularSpawnTimer += dt;
-    if (regularSpawnTimer >= DIFFICULTY_SETTINGS[difficulty].spawnInterval) {
-        spawnEnemy(false); 
-        spawnEnemy(false);
-        regularSpawnTimer = 0;
+    if (!multiplayer.enabled) {
+        regularSpawnTimer += dt;
+        if (regularSpawnTimer >= DIFFICULTY_SETTINGS[difficulty].spawnInterval) {
+            spawnEnemy(false); 
+            spawnEnemy(false);
+            regularSpawnTimer = 0;
+        }
+
+        bossSpawnTimer += dt;
+        if (bossSpawnTimer >= 180 && !hasBoss) {
+            spawnEnemy(true);
+            bossSpawnTimer = 0;
+        }
+
+        enemies = enemies.filter(enemy => {
+            if (enemy.health <= 0) {
+                spawnPickup(enemy.x, enemy.y);
+                if (enemy.type === 'boss') {
+                    score += 2500;
+                    hasBoss = false;
+                    bossUi.style.display = "none";
+                } else {
+                    score += enemy.type === 'creeper' ? 100 : 150;
+                }
+                scoreUi.innerText = score;
+                return false;
+            }
+
+            if (enemy.isFlying) {
+                enemy.hoverPhase += dt * 2.2;
+                enemy.z = 0.9 + Math.sin(enemy.hoverPhase) * 0.15;
+            }
+
+            let dx = playerX - enemy.x;
+            let dy = playerY - enemy.y;
+            let dist = Math.hypot(dx, dy);
+
+            if (dist < 22 && dist > 0.35) {
+                let moveX = enemy.x + (dx / dist) * enemy.speed * dt;
+                let moveY = enemy.y + (dy / dist) * enemy.speed * dt;
+                
+                if (map[Math.floor(enemy.y) * mapSize + Math.floor(moveX)] === 0) enemy.x = moveX;
+                if (map[Math.floor(moveY) * mapSize + Math.floor(enemy.x)] === 0) enemy.y = moveY;
+            }
+
+            if (dist <= 0.6) {
+                if (enemy.type === 'creeper') {
+                    health -= 45; 
+                    enemy.health = 0; 
+                    spawnExplosion(enemy.x, enemy.y, 0.2);
+                } else if (enemy.type === 'boss') {
+                    health -= 45 * dt; 
+                } else {
+                    health -= 14 * dt; 
+                }
+                
+                health = Math.max(0, Math.floor(health));
+                healthUi.innerText = health;
+                screenShake = Math.max(screenShake, 5);
+
+                const enemyAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX);
+                addDamageIndicator(enemyAngle);
+                
+                if (Math.random() < 0.15) {
+                    playHurtSound();
+                }
+            }
+            return true;
+        });
+    } else {
+        // Мультиплеер: враги приходят с сервера, отправляем свою позицию периодически
+        multiplayer.inputSendTimer += dt;
+        if (multiplayer.inputSendTimer >= 0.08) {
+            multiplayer.inputSendTimer = 0;
+            if (multiplayer.ws && multiplayer.ws.readyState === WebSocket.OPEN) {
+                multiplayer.ws.send(JSON.stringify({ type: 'input', x: playerX, y: playerY, angle: playerAngle }));
+            }
+        }
     }
-
-    bossSpawnTimer += dt;
-    if (bossSpawnTimer >= 180 && !hasBoss) {
-        spawnEnemy(true);
-        bossSpawnTimer = 0;
-    }
-
-    enemies = enemies.filter(enemy => {
-        if (enemy.health <= 0) {
-            spawnPickup(enemy.x, enemy.y);
-            if (enemy.type === 'boss') {
-                score += 2500;
-                hasBoss = false;
-                bossUi.style.display = "none";
-            } else {
-                score += enemy.type === 'creeper' ? 100 : 150;
-            }
-            scoreUi.innerText = score;
-            return false;
-        }
-
-        if (enemy.isFlying) {
-            enemy.hoverPhase += dt * 2.2;
-            enemy.z = 0.9 + Math.sin(enemy.hoverPhase) * 0.15;
-        }
-
-        let dx = playerX - enemy.x;
-        let dy = playerY - enemy.y;
-        let dist = Math.hypot(dx, dy);
-
-        if (dist < 22 && dist > 0.35) {
-            let moveX = enemy.x + (dx / dist) * enemy.speed * dt;
-            let moveY = enemy.y + (dy / dist) * enemy.speed * dt;
-            
-            if (map[Math.floor(enemy.y) * mapSize + Math.floor(moveX)] === 0) enemy.x = moveX;
-            if (map[Math.floor(moveY) * mapSize + Math.floor(enemy.x)] === 0) enemy.y = moveY;
-        }
-
-        if (dist <= 0.6) {
-            if (enemy.type === 'creeper') {
-                health -= 45; 
-                enemy.health = 0; 
-                spawnExplosion(enemy.x, enemy.y, 0.2);
-            } else if (enemy.type === 'boss') {
-                health -= 45 * dt; 
-            } else {
-                health -= 14 * dt; 
-            }
-            
-            health = Math.max(0, Math.floor(health));
-            healthUi.innerText = health;
-            screenShake = Math.max(screenShake, 5);
-
-            const enemyAngle = Math.atan2(enemy.y - playerY, enemy.x - playerX);
-            addDamageIndicator(enemyAngle);
-            
-            if (Math.random() < 0.15) {
-                playHurtSound();
-            }
-        }
-        return true;
-    });
 }
 
 // === РЕНДЕРИНГ И ТЕКСТУРИРОВАНИЕ ПОЛА ===
@@ -1752,6 +1988,20 @@ function render() {
             dist: Math.hypot(p.x - playerX, p.y - playerY)
         });
     });
+
+    if (multiplayer.enabled) {
+        Object.values(multiplayer.players).forEach(op => {
+            if (op.id === multiplayer.myId || !op.alive) return;
+            sprites.push({
+                x: op.x, y: op.y, z: 0,
+                type: 'netplayer',
+                color: op.color,
+                name: op.name,
+                size: 0.45,
+                dist: Math.hypot(op.x - playerX, op.y - playerY)
+            });
+        });
+    }
 
     sprites
         .sort((a, b) => b.dist - a.dist)
@@ -2081,6 +2331,28 @@ function render() {
                         ctx.globalAlpha = Math.max(0, sprite.life);
                         ctx.fillRect(-sprite.size / 2, -sprite.size / 2, sprite.size, sprite.size);
                         ctx.globalAlpha = 1.0;
+                    } else if (sprite.type === 'netplayer') {
+                        // Тень
+                        ctx.fillStyle = "rgba(0,0,0,0.35)";
+                        ctx.beginPath();
+                        ctx.ellipse(0, 6, spriteWidth / 3.2, spriteWidth / 10, 0, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Тело союзника
+                        ctx.fillStyle = sprite.color;
+                        ctx.fillRect(-spriteWidth / 5, -spriteScreenHeight / 1.5, spriteWidth / 2.5, spriteScreenHeight / 1.6);
+
+                        // Голова
+                        ctx.fillStyle = "#f0d0a8";
+                        ctx.beginPath();
+                        ctx.arc(0, -spriteScreenHeight / 1.35, spriteWidth / 6.5, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Имя над головой
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = 'bold 12px monospace';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(sprite.name, 0, -spriteScreenHeight / 1.35 - spriteWidth / 5);
                     }
                 }
             }
