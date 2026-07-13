@@ -84,8 +84,14 @@
 		function updateDifficultyUi() {
 			const label = config.DIFFICULTY_SETTINGS[state.difficulty].label; const el = document.getElementById("difficulty-val");
 			const mapLabel = config.MAP_LABELS[state.selectedMapName] || state.selectedMapName;
-			if (el) el.innerText = `${label} — ${mapLabel}` + (state.multiplayer.enabled ? ' (СЕТЬ)' : '');
+			let mpText = '';
+			if (state.multiplayer.enabled) {
+				const roomId = document.getElementById("mp-room").value;
+				mpText = ` (СЕТЬ: ${roomId})`;
+			}
+			if (el) el.innerText = `${label} — ${mapLabel}` + mpText;
 		}
+
 
 		function updateGrenadeUi() {
 			const el = document.getElementById("grenade-val");
