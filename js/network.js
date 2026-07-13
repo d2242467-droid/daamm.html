@@ -24,7 +24,8 @@ function hostGame() {
 	statusEl.innerText = 'Создание сервера...';
 
 	const peerId = "md3d-" + generateShortId();
-	const peer = new Peer(peerId);
+	const peerOptions = { config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun2.l.google.com:19302' }, { urls: 'stun:stun3.l.google.com:19302' }, { urls: 'stun:stun4.l.google.com:19302' }] } };
+	const peer = new Peer(peerId, peerOptions);
 
 	peer.on('open', (id) => {
 		statusEl.style.color = '#aaffaa';
@@ -104,7 +105,8 @@ function joinGame() {
 	statusEl.style.color = '#ffd23a';
 	statusEl.innerText = 'Подключение к ' + hostId + '...';
 
-	const peer = new Peer();
+	const peerOptions = { config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun2.l.google.com:19302' }, { urls: 'stun:stun3.l.google.com:19302' }, { urls: 'stun:stun4.l.google.com:19302' }] } };
+	const peer = new Peer(undefined, peerOptions);
 
 	peer.on('open', (id) => {
 		state.multiplayer.myId = id;
