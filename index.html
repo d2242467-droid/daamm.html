@@ -250,11 +250,19 @@
                <b>1, 2, 3, 4</b> — Смена оружия | <b>M</b> — Нож (ближний бой)<br>
                <b>Q</b> — Бросить гранату | <b>G</b> — Сменить тип гранаты
             </p>
-            <p class="text-[#e0aaff] mb-2 text-sm">Выберите сложность (Арена Brawl Stars):</p>
+            <p class="text-[#e0aaff] mb-2 text-sm">Выберите карту:</p>
+            <div class="flex gap-3 mb-4" style="flex-wrap: wrap;">
+                <button class="btn map-select-btn" data-map="CLASSIC" style="outline:3px solid #ffd700; background:#444; font-size:13px; padding:8px 14px;" onclick="selectMap('CLASSIC')">Классика</button>
+                <button class="btn map-select-btn" data-map="SCATTERED" style="background:#444; font-size:13px; padding:8px 14px;" onclick="selectMap('SCATTERED')">Шорох Листьев</button>
+                <button class="btn map-select-btn" data-map="CHAOS" style="background:#444; font-size:13px; padding:8px 14px;" onclick="selectMap('CHAOS')">Арена Хаоса</button>
+                <button class="btn map-select-btn" data-map="DIAMOND" style="background:#444; font-size:13px; padding:8px 14px;" onclick="selectMap('DIAMOND')">Алмазная Арена</button>
+            </div>
+
+            <p class="text-[#e0aaff] mb-2 text-sm">Выберите сложность:</p>
             <div class="flex gap-3 mb-4">
-                <button class="btn" style="background:#2b6b2b; box-shadow:0 5px 0 #164016; font-size:14px; padding:8px 18px;" onclick="startGame('EASY')">ЛЕГКО (КЛАССИКА)</button>
-                <button class="btn" style="background:#b38600; box-shadow:0 5px 0 #664c00; font-size:14px; padding:8px 18px;" onclick="startGame('MEDIUM')">СРЕДНЕ (ШОРОХ ЛИСТЬЕВ)</button>
-                <button class="btn" style="background:#ff2a2a; box-shadow:0 5px 0 #990000; font-size:14px; padding:8px 18px;" onclick="startGame('HARD')">СЛОЖНО (АРЕНА ХАОСА)</button>
+                <button class="btn" style="background:#2b6b2b; box-shadow:0 5px 0 #164016; font-size:14px; padding:8px 18px;" onclick="startGame('EASY')">ЛЕГКО</button>
+                <button class="btn" style="background:#b38600; box-shadow:0 5px 0 #664c00; font-size:14px; padding:8px 18px;" onclick="startGame('MEDIUM')">СРЕДНЕ</button>
+                <button class="btn" style="background:#ff2a2a; box-shadow:0 5px 0 #990000; font-size:14px; padding:8px 18px;" onclick="startGame('HARD')">СЛОЖНО</button>
             </div>
 
             <div class="border-t border-white/10 pt-3 w-full max-w-xs">
@@ -371,8 +379,8 @@ const mapSize = 32;
 
 // КАРТЫ BRAWL STARS (32x32)
 const MAPS = {
-    // 1. Классическая карта (Легко)
-    EASY: [
+    // 1. Классическая карта
+    CLASSIC: [
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,0,0,0,0,2,2,2,2,0,0,0,1,0,0,0,0,1,0,0,0,2,2,2,2,0,0,0,0,0,1,
@@ -407,7 +415,7 @@ const MAPS = {
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
     ],
     // 2. Шорох листьев / Rustling Leaves (Средне - много кустов и фланговых коридоров)
-    MEDIUM: [
+    SCATTERED: [
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
     1,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,1,
@@ -442,7 +450,7 @@ const MAPS = {
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
     ],
         // 3. Разбросанная арена / Scattered Arena (Сложно - на основе карты из Brawl Stars)
-    HARD: [
+    CHAOS: [
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,1,
@@ -475,9 +483,46 @@ const MAPS = {
     1,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    ],
+    // 4. Алмазная арена
+    DIAMOND: [
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,2,0,0,0,4,4,4,0,0,0,0,4,4,0,0,0,0,2,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,2,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,0,0,0,0,0,0,5,0,0,0,5,0,0,0,0,0,2,2,2,0,0,0,0,1,
+    1,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,5,5,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,5,0,0,5,5,0,0,0,0,1,
+    1,0,0,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,5,5,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,5,0,0,0,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,2,2,2,0,0,0,0,0,0,5,0,0,0,5,0,0,0,0,0,2,2,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,5,0,0,0,0,4,4,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,2,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,2,0,0,0,0,4,4,0,0,0,0,4,4,4,0,0,0,2,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
     ]
 };
-let map = MAPS.EASY.slice();
+let selectedMapName = 'CLASSIC';
+const MAP_LABELS = { CLASSIC: 'Классика', SCATTERED: 'Шорох Листьев', CHAOS: 'Арена Хаоса', DIAMOND: 'Алмазная Арена' };
+let map = MAPS[selectedMapName].slice();
 
 function findOpenSpawnCell(preferX, preferY) {
     // Раскручивающийся поиск ближайшей открытой (0) клетки от предпочитаемой точки,
@@ -511,9 +556,9 @@ const GRAVITY = 20.0;
 const JUMP_VELOCITY = 8.0;
 
 const DIFFICULTY_SETTINGS = {
-    EASY:   { label: "ЛЕГКО (КЛАССИКА)",  spawnInterval: 20, creeperHp: 50,  skeletonHp: 100, flyerHp: 100, spiderHp: 70,  bruteHp: 0,   bossHp: 1000, flyingEnemies: false, flyingBoss: false, spidersEnabled: false, brutesEnabled: false },
-    MEDIUM: { label: "СРЕДНЕ (ШОРОХ ЛИСТЬЕВ)", spawnInterval: 10, creeperHp: 200, skeletonHp: 200, flyerHp: 200, spiderHp: 150, bruteHp: 350, bossHp: 2000, flyingEnemies: true,  flyingBoss: false, spidersEnabled: true,  brutesEnabled: false },
-    HARD:   { label: "СЛОЖНО (АРЕНА ХАОСА)",   spawnInterval: 10, creeperHp: 500, skeletonHp: 500, flyerHp: 500, spiderHp: 400, bruteHp: 900, bossHp: 5000, flyingEnemies: true,  flyingBoss: true,  spidersEnabled: true,  brutesEnabled: true  }
+    EASY:   { label: "ЛЕГКО",  spawnInterval: 20, creeperHp: 50,  skeletonHp: 100, flyerHp: 100, spiderHp: 70,  bruteHp: 0,   bossHp: 1000, flyingEnemies: false, flyingBoss: false, spidersEnabled: false, brutesEnabled: false },
+    MEDIUM: { label: "СРЕДНЕ", spawnInterval: 10, creeperHp: 200, skeletonHp: 200, flyerHp: 200, spiderHp: 150, bruteHp: 350, bossHp: 2000, flyingEnemies: true,  flyingBoss: false, spidersEnabled: true,  brutesEnabled: false },
+    HARD:   { label: "СЛОЖНО",   spawnInterval: 10, creeperHp: 500, skeletonHp: 500, flyerHp: 500, spiderHp: 400, bruteHp: 900, bossHp: 5000, flyingEnemies: true,  flyingBoss: true,  spidersEnabled: true,  brutesEnabled: true  }
 };
 let difficulty = 'EASY';
 
@@ -1055,7 +1100,7 @@ function connectMultiplayer(serverUrl, roomCode, playerName, chosenDifficulty, o
         let msg; try { msg = JSON.parse(event.data); } catch (e) { return; }
         if (msg.type === 'joined') {
             clearTimeout(connectTimeout); multiplayer.myId = msg.id; multiplayer.enabled = true; multiplayer.ws = ws;
-            difficulty = msg.difficulty; map = MAPS[difficulty].slice(); rebuild3DMap(); onReady(msg.x, msg.y);
+            difficulty = msg.difficulty; map = MAPS.CLASSIC.slice(); rebuild3DMap(); onReady(msg.x, msg.y);
         } else if (msg.type === 'state') {
             enemies = msg.enemies.map(e => ({ id: e.id, type: e.type, x: e.x, y: e.y, z: e.z || 0, health: e.hp, maxHealth: e.maxHp, size: e.type === 'boss' ? 1.3 : 0.45, isFlying: e.isFlying }));
             multiplayer.players = {}; let me = null;
@@ -1231,20 +1276,26 @@ function attemptMultiplayerConnect() {
 function startGame(chosenDifficulty) {
     multiplayer.enabled = false;
     if (multiplayer.ws) { try { multiplayer.ws.close(); } catch (e) {} multiplayer.ws = null; }
-    if (chosenDifficulty) {
-        difficulty = chosenDifficulty;
-        map = MAPS[difficulty].slice();
-        if (mapBlocksGroup) rebuild3DMap();
-    }
+    if (chosenDifficulty) difficulty = chosenDifficulty;
+    map = MAPS[selectedMapName].slice();
+    if (mapBlocksGroup) rebuild3DMap();
     const spawn = findOpenSpawnCell(3, 3);
     playerX = spawn.x; playerY = spawn.y; playerAngle = 0.0; playerPitch = 0.0;
     initAudio(); document.getElementById("start-overlay").style.display = 'none';
     updateGrenadeUi(); gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
 }
 
+function selectMap(name) {
+    selectedMapName = name;
+    document.querySelectorAll('.map-select-btn').forEach(btn => {
+        btn.style.outline = (btn.dataset.map === name) ? '3px solid #ffd700' : 'none';
+    });
+}
+
 function updateDifficultyUi() {
     const label = DIFFICULTY_SETTINGS[difficulty].label; const el = document.getElementById("difficulty-val");
-    if (el) el.innerText = label + (multiplayer.enabled ? ' (СЕТЬ)' : '');
+    const mapLabel = MAP_LABELS[selectedMapName] || selectedMapName;
+    if (el) el.innerText = `${label} — ${mapLabel}` + (multiplayer.enabled ? ' (СЕТЬ)' : '');
 }
 
 function restartGame() {
