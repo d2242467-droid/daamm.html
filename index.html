@@ -391,6 +391,14 @@
                     <button class="buy-btn" id="btn-buy-health" onclick="buyUpgrade('health')">Улучшить (+25 HP) <br> <span id="cost-health">300</span> очков</button>
                 </div>
                 <div class="shop-item">
+                    <h3>Аптечка</h3>
+                    <p id="desc-medkit">Лечит 20 HP по нажатию H. Ещё не куплена.</p>
+                    <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
+                        <button class="buy-btn" id="btn-buy-medkit" onclick="buyUpgrade('medkit')">Купить (+1) <br> <span id="cost-medkit">200</span> очков</button>
+                        <button class="buy-btn" id="btn-upgrade-medkit" onclick="buyUpgrade('medkitUpgrade')" style="display:none;">Улучшить (+10 HP) <br> <span id="cost-medkitUpgrade">350</span> очков</button>
+                    </div>
+                </div>
+                <div class="shop-item">
                     <h3>Сила Атаки</h3>
                     <p id="desc-damage">Текущий урон: +0%. Увеличивает урон всех орудий.</p>
                     <button class="buy-btn" id="btn-buy-damage" onclick="buyUpgrade('damage')">Улучшить (+15%) <br> <span id="cost-damage">400</span> очков</button>
@@ -475,6 +483,7 @@
         <div>ОРУЖИЕ: <span id="weapon-name" style="color: #fff;">ДРОБОВИК [1] (2/2)</span></div>
         <div>ПАТРОНЫ: <span id="ammo-val">100</span> <span id="reload-msg" style="color: yellow;"></span></div>
         <div>ГРАНАТЫ: <span id="grenade-val" style="color:#ffaa55;">ГРАНАТА (0) [Q]</span></div>
+        <div>АПТЕЧКИ: <span id="medkit-val" style="color:#66ff88;">АПТЕЧКА (0) [H]</span></div>
         <div>СЧЕТ: <span id="score-val">0</span></div>
         <div>ВОЛНА: <span id="wave-val">0</span></div>
         <div>СЛОЖНОСТЬ: <span id="difficulty-val" style="color:#ffd700;">ЛЕГКО</span></div>
@@ -842,7 +851,14 @@ let difficulty = 'EASY';
 
 const multiplayer = { enabled: false, ws: null, myId: null, players: {}, inputSendTimer: 0 };
 let weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
-let shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
+let shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600, medkit: 200, medkitUpgrade: 350 };
+
+// АПТЕЧКА: расходуемый предмет магазина, лечит фиксированное кол-во HP по нажатию H.
+// medkitUnlocked становится true после ПЕРВОЙ покупки (не сбрасывается при расходовании
+// запаса) — именно он, а не medkitCount, решает, показывать ли кнопку "Улучшить" в магазине.
+let medkitCount = 0;          // сколько аптечек сейчас в инвентаре
+let medkitUnlocked = false;   // true после первой покупки — открывает кнопку "Улучшить"
+let medkitHealAmount = 20;    // сколько HP восстанавливает ОДНА аптечка (растёт на +10 за апгрейд)
 
 // МАГАЗИН: МАКС. ЁМКОСТЬ ОБОЙМ (растёт при покупке в магазине)
 let maxShotgunClip = 2;
@@ -2004,15 +2020,16 @@ function returnToMainMenu() {
     resetMinigunState();
     weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
     gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
-    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
+    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600, medkit: 200, medkitUpgrade: 350 };
     meleeTier = 0; chainsawCharge = maxChainsawCharge; isChainsawActive = false; chainsawTickTimer = 0;
     grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
+    medkitCount = 0; medkitUnlocked = false; medkitHealAmount = 20;
     tracers.forEach(t => { if (scene) { scene.remove(t.mesh); if (t.extraMesh) scene.remove(t.extraMesh); } }); tracers = [];
     enemies = []; projectiles = []; particles = []; pickups = [];
     WaveManager.reset();
     bossUi.style.display = "none"; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
     healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)"; reloadUi.innerText = "";
-    updateGrenadeUi(); updateWeaponVisibility(); updateDifficultyUi();
+    updateGrenadeUi(); updateMedkitUi(); updateWeaponVisibility(); updateDifficultyUi();
     gameState = 'START'; document.getElementById("start-overlay").style.display = 'flex';
 }
 
@@ -2020,6 +2037,22 @@ function updateShopUI() {
     document.getElementById("shop-score").innerText = `ВАШ СЧЕТ (ВАЛЮТА): ${score}`;
     document.getElementById("desc-health").innerText = `Текущий максимум: ${maxHealth} HP. Увеличится до ${maxHealth + 25} HP.`;
     document.getElementById("cost-health").innerText = shopCosts.health; document.getElementById("btn-buy-health").disabled = score < shopCosts.health;
+    // АПТЕЧКА: описание отражает текущее лечение/запас; кнопка "Купить" всегда доступна
+    // (доп. покупки просто добавляют в инвентарь), кнопка "Улучшить" СКРЫТА, пока предмет
+    // ни разу не куплен (medkitUnlocked === false), и ОТКЛЮЧЕНА (но видна), если очков не хватает.
+    document.getElementById("desc-medkit").innerText = medkitUnlocked
+        ? `Лечит ${medkitHealAmount} HP по нажатию H. В инвентаре: ${medkitCount}.`
+        : `Лечит ${medkitHealAmount} HP по нажатию H. Ещё не куплена.`;
+    document.getElementById("cost-medkit").innerText = shopCosts.medkit;
+    document.getElementById("btn-buy-medkit").disabled = score < shopCosts.medkit;
+    const medkitUpgradeBtn = document.getElementById("btn-upgrade-medkit");
+    if (!medkitUnlocked) {
+        medkitUpgradeBtn.style.display = "none";
+    } else {
+        medkitUpgradeBtn.style.display = "";
+        document.getElementById("cost-medkitUpgrade").innerText = shopCosts.medkitUpgrade;
+        medkitUpgradeBtn.disabled = score < shopCosts.medkitUpgrade;
+    }
     document.getElementById("desc-damage").innerText = `Текущий урон: +${Math.round((damageMultiplier - 1.0) * 100)}%. Увеличится еще на +15%.`;
     document.getElementById("cost-damage").innerText = shopCosts.damage; document.getElementById("btn-buy-damage").disabled = score < shopCosts.damage;
     const rBtn = document.getElementById("btn-buy-rifle");
@@ -2045,6 +2078,9 @@ function updateShopUI() {
 
 function buyUpgrade(type) {
     if (score < shopCosts[type]) return;
+    // ЗАЩИТА: улучшение аптечки недоступно, пока она ни разу не куплена (кнопка в
+    // магазине в этом случае скрыта — см. updateShopUI() — но проверяем и здесь на всякий случай).
+    if (type === 'medkitUpgrade' && !medkitUnlocked) return;
     initAudio(); playPickupSound();
     if (type === 'health') {
         score -= shopCosts.health; maxHealth += 25; health += 25; if (health > maxHealth) health = maxHealth;
@@ -2084,6 +2120,16 @@ function buyUpgrade(type) {
         showCenterMessage("Куплено: +2 Светошумовые гранаты!"); updateGrenadeUi();
     } else if (type === 'ammo') {
         score -= shopCosts.ammo; ammo = Math.min(200, ammo + 50); showCenterMessage("Получены боеприпасы (+50)!");
+    } else if (type === 'medkit') {
+        // ПОКУПКА АПТЕЧКИ: добавляет +1 к инвентарю и НАВСЕГДА открывает кнопку "Улучшить"
+        // (medkitUnlocked НЕ сбрасывается при расходовании аптечек — только при полном рестарте забега).
+        score -= shopCosts.medkit; medkitCount++; medkitUnlocked = true;
+        shopCosts.medkit = Math.floor(shopCosts.medkit * 1.4);
+        showCenterMessage("Куплена Аптечка (+1)!"); updateMedkitUi();
+    } else if (type === 'medkitUpgrade') {
+        score -= shopCosts.medkitUpgrade; medkitHealAmount += 10;
+        shopCosts.medkitUpgrade = Math.floor(shopCosts.medkitUpgrade * 1.7);
+        showCenterMessage(`Аптечка улучшена: теперь лечит ${medkitHealAmount} HP!`);
     }
     scoreUi.innerText = score; healthUi.innerText = health; ammoUi.innerText = ammo; updateShopUI(); updateInventoryUI();
 }
@@ -2195,9 +2241,10 @@ function attemptMultiplayerConnect() {
             currentWeapon = 'shotgun'; rocketLoaded = true; weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
             gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
             grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = []; meleeCooldownTimer = 0;
+            medkitCount = 0; medkitUnlocked = false; medkitHealAmount = 20;
             enemies = []; projectiles = []; particles = []; pickups = [];
             healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)";
-            updateGrenadeUi(); updateWeaponVisibility(); initAudio(); document.getElementById("start-overlay").style.display = 'none';
+            updateGrenadeUi(); updateMedkitUi(); updateWeaponVisibility(); initAudio(); document.getElementById("start-overlay").style.display = 'none';
             gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
         },
         (errorMsg) => { statusEl.style.color = '#ff8080'; statusEl.innerText = errorMsg; }
@@ -2228,7 +2275,7 @@ function startGame(chosenDifficulty, chosenMapKey) {
     screenShakeTimer = 0; damageVignetteTimer = 0;
     const dvEl = document.getElementById("damage-vignette"); if (dvEl) dvEl.style.opacity = 0;
     initAudio(); document.getElementById("start-overlay").style.display = 'none';
-    updateGrenadeUi(); gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
+    updateGrenadeUi(); updateMedkitUi(); gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
 }
 
 function updateDifficultyUi() {
@@ -2257,16 +2304,17 @@ function restartGame() {
     resetMinigunState();
     weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
     gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
-    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
+    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600, medkit: 200, medkitUpgrade: 350 };
     meleeTier = 0; chainsawCharge = maxChainsawCharge; isChainsawActive = false; chainsawTickTimer = 0;
     grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
+    medkitCount = 0; medkitUnlocked = false; medkitHealAmount = 20;
     tracers.forEach(t => { if (scene) { scene.remove(t.mesh); if (t.extraMesh) scene.remove(t.extraMesh); } }); tracers = [];
     enemies = []; projectiles = []; particles = []; pickups = [];
     spawnMapCoins(MAX_MAP_COINS); coinRespawnTimer = COIN_RESPAWN_INTERVAL;
     bossUi.style.display = "none"; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
     WaveManager.reset(); WaveManager.startNextWave();
     healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)"; reloadUi.innerText = "";
-    updateGrenadeUi(); updateWeaponVisibility(); gameState = 'PLAYING'; initAudio(); updateDifficultyUi(); canvas.requestPointerLock();
+    updateGrenadeUi(); updateMedkitUi(); updateWeaponVisibility(); gameState = 'PLAYING'; initAudio(); updateDifficultyUi(); canvas.requestPointerLock();
 }
 
 WaveManager.startNextWave();
@@ -2341,6 +2389,9 @@ window.addEventListener('keydown', e => {
     // G - СМЕНА ТИПА ГРАНАТЫ, Q - БРОСОК ГРАНАТЫ
     if (e.code === 'KeyG') { cycleGrenadeType(); }
     if (e.code === 'KeyQ') { throwGrenade(); }
+    // H - ИСПОЛЬЗОВАТЬ АПТЕЧКУ: расходует 1 шт. из инвентаря, лечит medkitHealAmount HP,
+    // не даёт здоровью превысить maxHealth.
+    if (e.code === 'KeyH') { useMedkit(); }
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
@@ -2348,6 +2399,12 @@ let isMouseDown = false; let isMouseLocked = false;
 canvas.addEventListener('mousedown', () => {
     if (gameState !== 'PLAYING') return;
     isMouseDown = true;
+    // ЛОКДАУН БОЯ: клик ЛКМ, пока активен щит, ПОЛНОСТЬЮ игнорируется — ни обычный
+    // выстрел, ни начало зарядки Гаусс-винтовки не запускаются. isMouseDown всё равно
+    // выставлен в true, так что если игрок продолжает держать ЛКМ, стрельба сама
+    // возобновится в update() сразу после того, как щит будет деактивирован — не
+    // нужно кликать заново.
+    if (isShieldActive) return;
     if (currentWeapon === 'gauss') {
         // ГАУСС-ВИНТОВКА: ЛКМ теперь НЕ стреляет сразу — начинает зарядку (см. updateGaussCharging).
         // Выстрел происходит при ОТПУСКАНИИ кнопки (releaseGaussCharge), см. mouseup ниже.
@@ -2392,6 +2449,29 @@ function updateGrenadeUi() {
     if (!el) return;
     const names = { frag: 'ГРАНАТА', molotov: 'МОЛОТОВ', flash: 'СВЕТОШУМОВАЯ' };
     el.innerText = `${names[currentGrenadeType]} (${grenadeCounts[currentGrenadeType]}) [Q]`;
+}
+
+// АПТЕЧКИ В HUD: показывает текущее количество в инвентаре и клавишу использования.
+function updateMedkitUi() {
+    const el = document.getElementById("medkit-val");
+    if (!el) return;
+    el.innerText = `АПТЕЧКА (${medkitCount}) [H]`;
+}
+
+// ИСПОЛЬЗОВАНИЕ АПТЕЧКИ (клавиша H): расходует 1 шт. из инвентаря, лечит на
+// medkitHealAmount HP, ЖЁСТКО ограничивая итоговое здоровье значением maxHealth
+// (Math.min не даёт health превысить максимум даже если аптечка лечит больше,
+// чем не хватает до полного HP).
+function useMedkit() {
+    if (gameState !== 'PLAYING' || health <= 0) return;
+    if (medkitCount <= 0) { showCenterMessage("Нет аптечек! Купите в магазине (E)."); return; }
+    if (health >= maxHealth) { showCenterMessage("Здоровье уже полное!"); return; }
+    medkitCount--;
+    health = Math.min(maxHealth, health + medkitHealAmount);
+    healthUi.innerText = Math.floor(health);
+    playPickupSound();
+    showCenterMessage(`+${medkitHealAmount} HP (Аптечка)`);
+    updateMedkitUi();
 }
 
 function cycleGrenadeType() {
@@ -2511,6 +2591,14 @@ function buildGrenadeMesh(type) {
 
 function executeShot(dt) {
     dt = dt || (1 / 60);
+    // ЛОКДАУН БОЯ: пока активен щит (N), стрельба ЛЮБЫМ оружием строго запрещена —
+    // executeShot() это единая точка входа для всех видов огня (дробовик, автомат,
+    // пулемёт, ракетница, пистолет, снайперка, огнемёт, бензопила), так что одной
+    // проверки здесь достаточно, чтобы перекрыть стрельбу отовсюду. Если игрок уже
+    // стрелял (зажатая ЛКМ вызывает executeShot() каждый кадр из update()) и нажал N —
+    // на СЛЕДУЮЩЕЙ ЖЕ проверке (isShieldActive выставляется в начале update(), ДО
+    // блока стрельбы) выстрел будет остановлен немедленно, в тот же кадр.
+    if (isShieldActive) return;
     if (health <= 0 || gameState !== 'PLAYING') return;
     if (currentWeapon === 'shotgun') {
         // УЛУЧШЕННЫЙ ДРОБОВИК: проверка магазина и увеличенный урон
@@ -2644,6 +2732,10 @@ function updateGaussCharging(dt) {
     if (health <= 0 || gameState !== 'PLAYING' || currentWeapon !== 'gauss') {
         gaussCharging = false; gaussChargePercent = 0; updateGaussChargeUi(); return;
     }
+    // ЛОКДАУН БОЯ: щит останавливает дальнейший набор заряда Гаусс-винтовки (но не
+    // сбрасывает уже набранный процент — см. releaseGaussCharge() ниже насчёт отпускания
+    // ЛКМ, пока щит активен).
+    if (isShieldActive) return;
     gaussChargePercent = Math.min(100, gaussChargePercent + (dt / GAUSS_CHARGE_TIME) * 100);
     updateGaussChargeUi();
 }
@@ -2655,6 +2747,9 @@ function releaseGaussCharge() {
     const chargePct = gaussChargePercent;
     gaussChargePercent = 0;
     updateGaussChargeUi();
+    // ЛОКДАУН БОЯ: если игрок отпустил ЛКМ, пока активен щит, выстрел ЗАПРЕЩЁН —
+    // накопленный заряд просто теряется без урона, без исключения для Гаусс-винтовки.
+    if (isShieldActive) return;
     if (gaussCharges <= 0 || health <= 0 || gameState !== 'PLAYING') return;
     gaussCharges = Math.max(0, gaussCharges - 1);
     weaponUi.innerText = `ГАУСС-ВИНТОВКА [8] (${gaussCharges} ЗАРЯДОВ)`;
