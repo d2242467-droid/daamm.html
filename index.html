@@ -232,6 +232,11 @@
             position: fixed; inset: 0; background: #ffffff; opacity: 0;
             pointer-events: none; z-index: 50; transition: none;
         }
+        #damage-vignette {
+            position: fixed; inset: 0; opacity: 0;
+            background: radial-gradient(circle, rgba(120,0,0,0) 35%, rgba(160,0,0,0.85) 100%);
+            pointer-events: none; z-index: 45; transition: none;
+        }
     </style>
 </head>
 <body>
@@ -239,6 +244,7 @@
     <button id="audio-toggle" onclick="toggleAudio()">МУЗЫКА: ВЫКЛ</button>
     <div id="boss-ui">⚠ ВНИМАНИЕ: БОСС БЛИЗКО (HP: <span id="boss-hp">1000</span>/<span id="boss-hp-max">1000</span>) ⚠</div>
     <div id="flash-overlay"></div>
+    <div id="damage-vignette"></div>
     
     <div id="game-container">
         <div id="crosshair"></div>
@@ -630,8 +636,8 @@ const MAPS = {
     EMERALD_RING: [
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,
+    1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,
+    1,0,1,0,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,
     1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,1,
@@ -655,8 +661,8 @@ const MAPS = {
     1,0,0,0,0,0,0,7,7,7,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,0,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,
+    1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,
+    1,0,1,0,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,
     1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
@@ -1884,6 +1890,8 @@ function startGame(chosenDifficulty, chosenMapKey) {
     const spawn = findOpenSpawnCell(3, 3);
     playerX = spawn.x; playerY = spawn.y; playerAngle = 0.0; playerPitch = 0.0;
     pickups = pickups.filter(p => p.type !== 'coin'); spawnMapCoins(MAX_MAP_COINS); coinRespawnTimer = COIN_RESPAWN_INTERVAL;
+    screenShakeTimer = 0; damageVignetteTimer = 0;
+    const dvEl = document.getElementById("damage-vignette"); if (dvEl) dvEl.style.opacity = 0;
     initAudio(); document.getElementById("start-overlay").style.display = 'none';
     updateGrenadeUi(); gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
 }
@@ -2068,6 +2076,42 @@ function detonateGrenade(g) {
     }
 }
 
+// ==========================================================================
+// ЦЕНТРАЛИЗОВАННАЯ ФУНКЦИЯ УРОНА ИГРОКУ — takeDamage()
+// ==========================================================================
+// Раньше каждый источник урона (взрыв, снаряд, лазер, поджог, контакт и
+// т.д.) сам напрямую уменьшал health и обновлял healthUi. Теперь ЛЮБОЙ урон
+// игроку проходит через takeDamage(amount), которая ДОПОЛНИТЕЛЬНО запускает
+// визуальную обратную связь:
+//  1) ТРЯСКА КАМЕРЫ — короткое случайное смещение позиции камеры на 0.1 сек
+//     (см. screenShakeTimer / triggerScreenShake() и render3D()).
+//  2) "КРОВАВАЯ" ВИНЬЕТКА — полупрозрачный красный слой поверх canvas,
+//     плавно затухающий за 0.5 сек (см. damageVignetteTimer / DOM-элемент
+//     #damage-vignette).
+// Индикатор направления урона (addDamageIndicator) и звук по-прежнему
+// вызываются в местах получения урона ОТДЕЛЬНО — они несут доп. информацию
+// (откуда пришёл урон) и намеренно не должны срабатывать на КАЖДЫЙ тик
+// длительного урона (лазер босса, огненная зона и т.п.), в отличие от
+// тряски/виньетки, которые уместны при любом уроне.
+function takeDamage(amount) {
+    if (!(amount > 0) || health <= 0) return;
+    health = Math.max(0, health - amount);
+    healthUi.innerText = Math.floor(health);
+    triggerScreenShake();
+    triggerDamageVignette();
+}
+
+// ТРЯСКА КАМЕРЫ
+let screenShakeTimer = 0;
+const SCREEN_SHAKE_DURATION = 0.1; // сек
+const SCREEN_SHAKE_MAGNITUDE = 0.09; // максимальное случайное смещение камеры по каждой оси
+function triggerScreenShake() { screenShakeTimer = SCREEN_SHAKE_DURATION; }
+
+// ВИНЬЕТКА УРОНА
+let damageVignetteTimer = 0;
+const DAMAGE_VIGNETTE_DURATION = 0.5; // сек
+function triggerDamageVignette() { damageVignetteTimer = DAMAGE_VIGNETTE_DURATION; }
+
 function applyAoeDamage(ex, ey, radius, dmg, includePlayer) {
     enemies.forEach(enemy => {
         let dist = Math.hypot(enemy.x - ex, enemy.y - ey);
@@ -2082,7 +2126,7 @@ function applyAoeDamage(ex, ey, radius, dmg, includePlayer) {
         let distToPlayer = Math.hypot(playerX - ex, playerY - ey);
         if (distToPlayer < radius) {
             let falloff = 1.0 - (distToPlayer / radius);
-            health = Math.max(0, health - Math.floor(dmg * 0.6 * falloff)); healthUi.innerText = health;
+            takeDamage(Math.floor(dmg * 0.6 * falloff));
             addDamageIndicator(Math.atan2(ey - playerY, ex - playerX)); playHurtSound();
         }
     }
@@ -2639,7 +2683,7 @@ function update(dt) {
         let distToPlayer = Math.hypot(playerX - ex, playerY - ey);
         if (distToPlayer < 2.5) {
             let dmgFactor = 1.0 - (distToPlayer / 2.5);
-            health = Math.max(0, health - Math.floor(40 * dmgFactor)); healthUi.innerText = health;
+            takeDamage(Math.floor(40 * dmgFactor));
             addDamageIndicator(Math.atan2(ey - playerY, ex - playerX)); playHurtSound();
         }
     }
@@ -2672,7 +2716,7 @@ function update(dt) {
             if (cx < 0 || cx >= mapSize || cy < 0 || cy >= mapSize || (projCell > 0 && projCell !== WATER_TILE && projCell !== BUSH_TILE)) return false;
             if (p.life <= 0) return false;
             if (Math.hypot(playerX - p.x, playerY - p.y) < 0.45) {
-                health = Math.max(0, health - p.damage); healthUi.innerText = health;
+                takeDamage(p.damage);
                 addDamageIndicator(Math.atan2(p.y - playerY, p.x - playerX));
                 spawnBlood(playerX, playerY, 3);
                 if (Math.random() < 0.4) playHurtSound();
@@ -2710,7 +2754,7 @@ function update(dt) {
                 }
             });
             if (Math.hypot(playerX - fz.x, playerY - fz.y) < fz.radius) {
-                health = Math.max(0, health - MOLOTOV_TICK_DAMAGE * dt); healthUi.innerText = Math.floor(health);
+                takeDamage(MOLOTOV_TICK_DAMAGE * dt);
             }
             return fz.duration > 0;
         });
@@ -2720,6 +2764,16 @@ function update(dt) {
         flashOverlayTimer -= dt;
         const el = document.getElementById("flash-overlay");
         if (el) el.style.opacity = Math.max(0, flashOverlayTimer / 1.2) * 0.9;
+    }
+
+    // ТРЯСКА КАМЕРЫ: сам оффсет применяется в render3D() каждый кадр, пока таймер > 0
+    if (screenShakeTimer > 0) screenShakeTimer -= dt;
+
+    // ВИНЬЕТКА УРОНА: плавное затухание красного слоя за DAMAGE_VIGNETTE_DURATION сек
+    if (damageVignetteTimer > 0) {
+        damageVignetteTimer -= dt;
+        const vEl = document.getElementById("damage-vignette");
+        if (vEl) vEl.style.opacity = Math.max(0, damageVignetteTimer / DAMAGE_VIGNETTE_DURATION) * 0.85;
     }
 
     pickups = pickups.filter(p => {
@@ -2818,7 +2872,7 @@ function update(dt) {
                     if (enemy.beamTickTimer <= 0) {
                         enemy.beamTickTimer = 0.5;
                         if (Math.hypot(playerX - enemy.x, playerY - enemy.y) < 5.0) {
-                            health = Math.max(0, health - 6 * FLYING_DAMAGE_MULTIPLIER); healthUi.innerText = Math.floor(health);
+                            takeDamage(6 * FLYING_DAMAGE_MULTIPLIER);
                             addDamageIndicator(Math.atan2(enemy.y - playerY, enemy.x - playerX));
                             spawnBlood(playerX, playerY, 2);
                         }
@@ -2850,7 +2904,7 @@ function update(dt) {
                     } else if (enemy.abilityState === 'laser') {
                         enemy.abilityDuration -= dt;
                         if (enemyHasLineOfSight(enemy) && Math.hypot(playerX - enemy.x, playerY - enemy.y) < 16) {
-                            health = Math.max(0, health - 22 * dt); healthUi.innerText = Math.floor(health);
+                            takeDamage(22 * dt);
                             if (Math.random() < 0.15) { addDamageIndicator(Math.atan2(enemy.y - playerY, enemy.x - playerX)); spawnBlood(playerX, playerY, 1); }
                         }
                         if (enemy.abilityDuration <= 0) { enemy.abilityState = 'idle'; enemy.abilityTimer = 5 + Math.random() * 3; }
@@ -2909,17 +2963,18 @@ function update(dt) {
             }
 
             if (dist <= 0.6) {
+                let contactDmg;
                 if (enemy.type === 'creeper') {
-                    health -= 45; enemy.health = 0; spawnExplosion(enemy.x, enemy.y, 0.2);
+                    contactDmg = 45; enemy.health = 0; spawnExplosion(enemy.x, enemy.y, 0.2);
                 } else if (enemy.type === 'boss') {
                     // Летающий босс тоже подпадает под нерф урона летающих врагов
-                    health -= 45 * (enemy.isFlying ? FLYING_DAMAGE_MULTIPLIER : 1) * dt;
+                    contactDmg = 45 * (enemy.isFlying ? FLYING_DAMAGE_MULTIPLIER : 1) * dt;
                 } else {
                     // Обычные летающие враги (flyer) наносят вдвое меньше контактного урона
-                    health -= 14 * (enemy.isFlying ? FLYING_DAMAGE_MULTIPLIER : 1) * dt;
+                    contactDmg = 14 * (enemy.isFlying ? FLYING_DAMAGE_MULTIPLIER : 1) * dt;
                 }
-                health = Math.max(0, Math.floor(health)); healthUi.innerText = health;
-                
+                takeDamage(contactDmg);
+
                 // ВЫЗОВ НАПРАВЛЕННОГО ИНДИКАТОРА УРОНА (ДУГА ВОКРУГ ПРИЦЕЛА)
                 addDamageIndicator(Math.atan2(enemy.y - playerY, enemy.x - playerX));
                 if (Math.random() < 0.15) playHurtSound();
@@ -2972,6 +3027,14 @@ function renderMinimap() {
 
 function render3D() {
     camera.position.set(playerX, 0.75 + playerZ, playerY);
+    // ТРЯСКА КАМЕРЫ ПРИ УРОНЕ: случайное смещение по всем трём осям, пока screenShakeTimer > 0
+    // (см. takeDamage() -> triggerScreenShake(); длится SCREEN_SHAKE_DURATION = 0.1 сек).
+    if (screenShakeTimer > 0) {
+        const shakeAmt = SCREEN_SHAKE_MAGNITUDE * (screenShakeTimer / SCREEN_SHAKE_DURATION);
+        camera.position.x += (Math.random() - 0.5) * shakeAmt;
+        camera.position.y += (Math.random() - 0.5) * shakeAmt;
+        camera.position.z += (Math.random() - 0.5) * shakeAmt;
+    }
     const lookX = playerX + Math.cos(playerAngle); const lookY = 0.75 + playerZ + Math.tan(playerPitch); const lookZ = playerY + Math.sin(playerAngle);
     camera.lookAt(new THREE.Vector3(lookX, lookY, lookZ));
     let swayX = 0; let swayY = 0;
