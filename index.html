@@ -263,6 +263,46 @@
             text-align: center; white-space: pre-line; line-height: 1.3; opacity: 0;
             pointer-events: none; transition: opacity 0.12s linear; z-index: 40; text-shadow: 0 0 5px #000, 0 0 5px #000;
         }
+
+        /* ======================================================================
+           ПОЛНОЭКРАННЫЙ РЕЖИМ (клавиша F): #game-container растягивается на весь
+           экран, #gameCanvas сохраняет пропорции (object-fit: contain), а #ui
+           превращается в фиксированную панель, положение которой пересчитывается
+           в JS через window.innerWidth/innerHeight (см. updateUIForScreenSize()).
+           ====================================================================== */
+        body.fullscreen-mode { overflow: hidden; }
+        #game-container.fullscreen-mode {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            z-index: 200;
+            background: #0b050f;
+        }
+        #gameCanvas.fullscreen-mode {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        #ui.fullscreen-mode {
+            position: fixed;
+            z-index: 201;
+            margin-top: 0;
+        }
+
+        /* СЧЕТЧИК ВОЛН: короткая анимация масштаба 1.0 -> 1.2 -> 1.0 при старте новой волны */
+        @keyframes wavePulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); color: #ffd700; }
+            100% { transform: scale(1); }
+        }
+        #wave-val.wave-pulse {
+            display: inline-block;
+            animation: wavePulse 0.4s ease-in-out;
+        }
     </style>
 </head>
 <body>
@@ -412,6 +452,7 @@
         <div>ПАТРОНЫ: <span id="ammo-val">100</span> <span id="reload-msg" style="color: yellow;"></span></div>
         <div>ГРАНАТЫ: <span id="grenade-val" style="color:#ffaa55;">ГРАНАТА (0) [Q]</span></div>
         <div>СЧЕТ: <span id="score-val">0</span></div>
+        <div>ВОЛНА: <span id="wave-val">0</span></div>
         <div>СЛОЖНОСТЬ: <span id="difficulty-val" style="color:#ffd700;">ЛЕГКО</span></div>
         <div><button onclick="toggleShop()" class="shop-btn-small">МАГАЗИН (E)</button></div>
     </div>
@@ -770,21 +811,11 @@ let minigunClip = 100;
 let pistolClip = 12;
 let sniperClip = 5;
 let flamethrowerFuel = 100;
-// СТАНДАРТНЫЙ РАЗМЕР БОЕПРИПАСОВ: столько патронов даёт обычный пикап боеприпасов
-// ЛЮБОМУ оружию (см. общий пул `ammo`, используемый дробовиком/автоматом/пулемётом/
-// пистолетом/снайперкой). Гаусс-винтовка ссылается на эту же константу ниже, чтобы её
-// бонус x3 всегда оставался кратным стандартной выдаче патронов, а не отдельным магическим числом.
-const STANDARD_AMMO_PICKUP_AMOUNT = 35;
 // ГАУСС-ВИНТОВКА: секретное оружие, НЕ продаётся в магазине — выпадает только с боссов.
 // Вместо обоймы использует "заряды" (gaussCharges), пополняемые дропом с боссов.
 let gaussCharges = 0;
 const BASE_GAUSS_DAMAGE = 140; // урон каждой цели, пробиваемой лучом на уровне заряда 50%-70% (не убывает с числом целей)
-// ВЫДАЧА ПРИ ДРОПЕ С БОССА: в 3 РАЗА больше стандартного количества патронов, которое
-// получает любое ДРУГОЕ оружие с обычного пикапа (STANDARD_AMMO_PICKUP_AMOUNT). Множитель
-// применяется ТОЛЬКО к Гаусс-винтовке — обычный пикап боеприпасов (см. пикап 'ammo' ниже)
-// по-прежнему выдаёт ровно STANDARD_AMMO_PICKUP_AMOUNT патронов, без изменений.
-const GAUSS_BOSS_DROP_MULTIPLIER = 3;
-const GAUSS_CHARGES_PER_DROP = STANDARD_AMMO_PICKUP_AMOUNT * GAUSS_BOSS_DROP_MULTIPLIER; // = 105
+const GAUSS_CHARGES_PER_DROP = 6; // сколько зарядов даёт один дроп с босса
 let isShooting = false;
 let shootTimer = 0;
 let walkCycle = 0;
@@ -881,10 +912,12 @@ const WaveManager = {
             spawnEnemy(true);
         }
         showCenterMessage(`ВОЛНА ${this.currentWave}`);
+        updateWaveUi(this.currentWave);
     },
 
     reset() {
         this.currentWave = 0;
+        updateWaveUi(0, false);
     }
 };
 
@@ -925,6 +958,20 @@ const FLASH_STUN_DURATION = 3.0;
 let messageText = "";
 let messageTimer = 0;
 function showCenterMessage(text) { messageText = text; messageTimer = 2.5; }
+
+// СЧЕТЧИК ВОЛН: обновляет текст "Волна: X" и (по умолчанию) запускает короткую
+// анимацию масштабирования 1.0 -> 1.2 -> 1.0, привлекающую внимание к новой волне.
+function updateWaveUi(waveNumber, animate = true) {
+    const el = document.getElementById('wave-val');
+    if (!el) return;
+    el.innerText = waveNumber;
+    if (animate) {
+        el.classList.remove('wave-pulse');
+        // Форсируем reflow, чтобы анимация могла быть перезапущена даже если волны идут подряд
+        void el.offsetWidth;
+        el.classList.add('wave-pulse');
+    }
+}
 
 let enemies = [];
 let projectiles = []; 
@@ -1976,6 +2023,7 @@ WaveManager.startNextWave();
 const keys = {};
 window.addEventListener('keydown', e => {
     if (e.code === 'KeyE') { toggleShop(); return; }
+    if (e.code === 'KeyF') { toggleFullscreen(); return; }
     if (gameState !== 'PLAYING') return;
     keys[e.code] = true;
     
@@ -2081,6 +2129,9 @@ canvas.addEventListener('touchmove', (e) => {
 });
 
 function triggerMuzzleFlash() {
+    // ЦВЕТ ВСПЫШКИ ЗАВИСИТ ОТ ОРУЖИЯ: Гаусс-винтовка теперь целиком синяя тема
+    // (ствол, катушки, луч, взрывы), поэтому и вспышка/подсветка от выстрела тоже синяя.
+    if (muzzleLight) muzzleLight.color.setHex(currentWeapon === 'gauss' ? 0x00BFFF : 0xffdd66);
     muzzleFlashTimer = MUZZLE_FLASH_DURATION;
 }
 
@@ -2428,7 +2479,7 @@ function fireGaussChargedShot(chargePct) {
     if (chargePct < 30) {
         const firstDist = pierced.length ? Math.min(pierced[0].dist, wallDist) : wallDist;
         const impact = origin.clone().addScaledVector(dir, firstDist);
-        spawnExplosion(impact.x, impact.z, impact.y);
+        spawnBlueExplosion(impact.x, impact.z, impact.y);
         applyAoeDamage(impact.x, impact.z, GAUSS_ROCKET_RADIUS, BASE_ROCKET_DAMAGE * damageMultiplier, true);
         spawnGaussBeam(origin, dir, firstDist);
         return;
@@ -2459,13 +2510,13 @@ function fireGaussChargedShot(chargePct) {
     if (chargePct >= 50 && chargePct < 70) {
         // ===================== 50%–70%: ЛУЧ + ВЗРЫВ В ТОЧКЕ ПОПАДАНИЯ =====================
         const impact = origin.clone().addScaledVector(dir, wallDist);
-        spawnExplosion(impact.x, impact.z, impact.y);
+        spawnBlueExplosion(impact.x, impact.z, impact.y);
         applyAoeDamage(impact.x, impact.z, GAUSS_TIER3_EXPLOSION_RADIUS, GAUSS_TIER3_EXPLOSION_DAMAGE * damageMultiplier, true);
     } else if (chargePct >= 70) {
         // ===================== 70%–100%: ЛУЧ + ТРИ ВЗРЫВА ВДОЛЬ ВСЕГО ПУТИ =====================
         for (const frac of [0.25, 0.5, 0.75]) {
             const p = origin.clone().addScaledVector(dir, wallDist * frac);
-            spawnExplosion(p.x, p.z, p.y);
+            spawnBlueExplosion(p.x, p.z, p.y);
             applyAoeDamage(p.x, p.z, GAUSS_TIER4_EXPLOSION_RADIUS, GAUSS_TIER4_EXPLOSION_DAMAGE * damageMultiplier, true);
         }
     }
@@ -2981,7 +3032,7 @@ function update(dt) {
                 if (currentWeapon === 'gauss') weaponUi.innerText = `ГАУСС-ВИНТОВКА [8] (${gaussCharges} ЗАРЯДОВ)`;
                 updateInventoryUI();
             }
-            else { ammo = Math.min(200, ammo + STANDARD_AMMO_PICKUP_AMOUNT); ammoUi.innerText = ammo; }
+            else { ammo = Math.min(200, ammo + 35); ammoUi.innerText = ammo; }
             return false;
         }
         return true;
@@ -3270,11 +3321,77 @@ function gameLoop(currentTime) {
 }
 
 window.onload = function () { init3D(); updateInventoryUI(); requestAnimationFrame(gameLoop); }
+
+// ==========================================================================
+// ПОЛНОЭКРАННЫЙ РЕЖИМ (клавиша F)
+// ==========================================================================
+// 1) #gameCanvas растягивается на 100% ширины/высоты экрана, сохраняя пропорции
+//    (object-fit: contain — см. CSS-класс .fullscreen-mode).
+// 2) UI-элементы (счетчики, полоски здоровья и т.д.) пересчитывают позицию
+//    относительно window.innerWidth/innerHeight, оставаясь "приклеенными" к
+//    углам экрана — см. updateUIForScreenSize() ниже.
+function toggleFullscreen() {
+    const container = document.getElementById('game-container');
+    if (!document.fullscreenElement) {
+        (container.requestFullscreen || container.webkitRequestFullscreen || container.msRequestFullscreen)
+            .call(container)
+            .catch(err => console.warn('Не удалось войти в полноэкранный режим:', err));
+    } else {
+        (document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen).call(document);
+    }
+}
+
+// Пересчитывает положение #ui (панель ЗДОРОВЬЕ/ОРУЖИЕ/ПАТРОНЫ/ВОЛНА/СЧЕТ) так,
+// чтобы она оставалась приклеенной к нижнему краю экрана и растянутой по ширине,
+// используя АКТУАЛЬНЫЕ размеры окна (важно, т.к. пользователь может сменить
+// монитор/ориентацию, не выходя из полноэкранного режима).
+function updateUIForScreenSize() {
+    const ui = document.getElementById('ui');
+    if (!ui) return;
+    const isFs = !!document.fullscreenElement;
+    if (isFs) {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        ui.style.left = '0px';
+        ui.style.width = vw + 'px';
+        // Приклеиваем панель к нижнему краю экрана с небольшим отступом
+        ui.style.top = Math.max(0, vh - ui.offsetHeight - 8) + 'px';
+    } else {
+        // Возврат к обычному потоковому расположению (см. базовые правила #ui в CSS)
+        ui.style.left = '';
+        ui.style.width = '';
+        ui.style.top = '';
+    }
+}
+
+document.addEventListener('fullscreenchange', () => {
+    const container = document.getElementById('game-container');
+    const canvas = document.getElementById('gameCanvas');
+    const isFs = !!document.fullscreenElement;
+
+    document.body.classList.toggle('fullscreen-mode', isFs);
+    container.classList.toggle('fullscreen-mode', isFs);
+    canvas.classList.toggle('fullscreen-mode', isFs);
+    document.getElementById('ui').classList.toggle('fullscreen-mode', isFs);
+
+    // Ждём кадр, чтобы браузер успел применить новые CSS-размеры перед тем,
+    // как мы прочитаем clientWidth/clientHeight канваса для рендерера и UI.
+    requestAnimationFrame(() => {
+        if (camera && renderer) {
+            camera.aspect = canvas.clientWidth / canvas.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        }
+        updateUIForScreenSize();
+    });
+});
+
 window.addEventListener('resize', () => {
     if (camera && renderer) {
         camera.aspect = canvas.clientWidth / canvas.clientHeight; camera.updateProjectionMatrix();
         renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     }
+    updateUIForScreenSize();
 });
 </script>
 </body>
