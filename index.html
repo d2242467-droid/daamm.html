@@ -819,7 +819,7 @@ let flamethrowerFuel = 100;
 // ГАУСС-ВИНТОВКА: секретное оружие, НЕ продаётся в магазине — выпадает только с боссов.
 // Вместо обоймы использует "заряды" (gaussCharges), пополняемые дропом с боссов.
 let gaussCharges = 0;
-const BASE_GAUSS_DAMAGE = 140; // урон каждой цели, пробиваемой лучом на уровне заряда 50%-70% (не убывает с числом целей)
+const BASE_GAUSS_DAMAGE = 140 * 4; // урон каждой цели, пробиваемой лучом на уровне заряда 50%-70% (не убывает с числом целей); БУСТ x4 урона базового Гаусс-луча
 const GAUSS_CHARGES_PER_DROP = 6; // сколько зарядов даёт один дроп с босса
 let isShooting = false;
 let shootTimer = 0;
@@ -1724,15 +1724,18 @@ function syncEntitiesWith3DScene() {
         }
         if (entityData.animator) entityData.animator(time);
 
-        // ВИЗУАЛ СПОСОБНОСТЕЙ БОССА: синий лазер (наземный "Ворден" + постоянный луч летающего
-        // босса, у которого раньше НЕ было визуала вообще — отсюда "невидимый лазер"), красная
-        // линия-телеграф ПЕРЕД лазером (1 сек предупреждения) и красное кольцо-предупреждение
-        // земляного взрыва.
+        // ВИЗУАЛ СПОСОБНОСТЕЙ БОССА: постоянный синий луч летающего босса, красное кольцо-
+        // предупреждение земляного взрыва, и пульсирующая сфера-телеграф ("заряд пустоты")
+        // перед выстрелом наземного Вордена — сам выстрел рендерится отдельно, одноразовым
+        // цилиндром-"стеклянной трубкой" через spawnWardenVoidBeam() (см. ниже), независимо
+        // от этого постоянного per-enemy меша.
         if (enemy.type === 'boss') {
             if (!entityData.laserBeam) {
                 // ТОНКИЙ MESH вместо THREE.Line: linewidth у LineBasicMaterial игнорируется
                 // почти всеми WebGL-бэкендами (всегда ~1px), из-за чего луч был практически не
                 // виден. Цилиндр + яркий emissive-материал дают настоящую толщину и свечение.
+                // Используется ТОЛЬКО постоянным лучом летающего босса (наземный Ворден теперь
+                // стреляет одноразовым лучом пустоты через spawnWardenVoidBeam()).
                 const laserGeo = new THREE.CylinderGeometry(0.045, 0.045, 1, 8, 1, true);
                 const laserMat = new THREE.MeshStandardMaterial({
                     color: 0x00BFFF, emissive: 0x00BFFF, emissiveIntensity: 3.0,
@@ -1750,38 +1753,28 @@ function syncEntitiesWith3DScene() {
                 entityData.warnRing = new THREE.Mesh(ringGeo, ringMat);
                 entityData.warnRing.rotation.x = -Math.PI / 2; entityData.warnRing.visible = false; scene.add(entityData.warnRing);
             }
-            if (!entityData.laserWarnLine) {
-                // ТЕЛЕГРАФ ЛАЗЕРА: тонкая, полупрозрачная КРАСНАЯ линия НА ЗЕМЛЕ вдоль будущей
-                // траектории лазера, показывается ровно 1 секунду перед активацией самого луча.
-                const warnLineMat = new THREE.LineBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.55 });
-                entityData.laserWarnLine = new THREE.Line(new THREE.BufferGeometry(), warnLineMat);
-                entityData.laserWarnLine.visible = false;
-                entityData.laserWarnLine.renderOrder = 999;
-                scene.add(entityData.laserWarnLine);
+            if (!entityData.voidChargeOrb) {
+                // ТЕЛЕГРАФ ЛУЧА ПУСТОТЫ: небольшая пульсирующая сфера тёмно-фиолетовой энергии
+                // у пасти/рук Вордена, видна ровно WARDEN_BEAM_CHARGE_TIME секунд перед выстрелом,
+                // чтобы игрок мог понять, что атака сейчас начнётся, и увернуться.
+                const orbGeo = new THREE.SphereGeometry(0.16, 12, 12);
+                const orbMat = new THREE.MeshBasicMaterial({
+                    color: 0x8B2FE0, transparent: true, opacity: 0.85,
+                    blending: THREE.AdditiveBlending, depthWrite: false
+                });
+                entityData.voidChargeOrb = new THREE.Mesh(orbGeo, orbMat);
+                entityData.voidChargeOrb.visible = false;
+                entityData.voidChargeOrb.renderOrder = 999;
+                scene.add(entityData.voidChargeOrb);
             }
 
-            // Наземный босс: телеграф активен в 'laserWarn' (1 сек), сам луч — только в 'laser'.
-            // Летающий босс: постоянный луч сверху, пока игрок в радиусе действия (см. update()).
-            const groundLaserActive = (!enemy.isFlying && enemy.abilityState === 'laser');
-            const groundLaserWarnActive = (!enemy.isFlying && enemy.abilityState === 'laserWarn');
+            // Летающий босс: постоянный следящий луч сверху, пока игрок в радиусе действия (см. update()).
             const flyingBeamActive = (enemy.isFlying && Math.hypot(playerX - enemy.x, playerY - enemy.y) < 5.0);
-            entityData.laserBeam.visible = groundLaserActive || flyingBeamActive;
-            entityData.laserWarnLine.visible = groundLaserWarnActive;
-
-            if (entityData.laserWarnLine.visible) {
-                // Линия телеграфа лежит НА ЗЕМЛЕ (небольшая высота над полом) и, как и сам луч,
-                // пересчитывается каждый кадр от текущей позиции босса к текущей позиции игрока —
-                // это честно показывает, куда прилетит урон, если игрок останется на месте.
-                const groundFrom = new THREE.Vector3(enemy.x, 0.06, enemy.y);
-                const groundTo = new THREE.Vector3(playerX, 0.06, playerY);
-                entityData.laserWarnLine.geometry.dispose();
-                entityData.laserWarnLine.geometry = new THREE.BufferGeometry().setFromPoints([groundFrom, groundTo]);
-            }
-
+            entityData.laserBeam.visible = flyingBeamActive;
             if (entityData.laserBeam.visible) {
                 // КАЖДЫЙ КАДР пересчитываем луч заново от текущей позиции босса (source) к текущей
                 // позиции игрока (target) — а не один раз при создании.
-                const from = new THREE.Vector3(enemy.x, enemy.isFlying ? (enemy.z || 0.9) + 0.3 : 1.2, enemy.y);
+                const from = new THREE.Vector3(enemy.x, (enemy.z || 0.9) + 0.3, enemy.y);
                 const to = new THREE.Vector3(playerX, 0.75 + playerZ, playerY);
                 const dir = new THREE.Vector3().subVectors(to, from);
                 const dist = dir.length();
@@ -1792,8 +1785,27 @@ function syncEntitiesWith3DScene() {
                     entityData.laserBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
                 }
             }
+
             entityData.warnRing.visible = (enemy.abilityState === 'warn');
             if (entityData.warnRing.visible) { entityData.warnRing.position.set(enemy.warnX, 0.05, enemy.warnY); }
+
+            entityData.voidChargeOrb.visible = (!enemy.isFlying && enemy.abilityState === 'voidCharge');
+            if (entityData.voidChargeOrb.visible) {
+                // Пульсация размера/яркости нарастает по мере приближения момента выстрела —
+                // читаемый визуальный сигнал "атака вот-вот произойдёт".
+                const chargeProgress = 1 - Math.max(0, enemy.abilityDuration) / WARDEN_BEAM_CHARGE_TIME; // 0 -> 1
+                const pulse = 1 + Math.sin(time * 18) * 0.15;
+                const scale = (0.55 + chargeProgress * 0.9) * pulse;
+                entityData.voidChargeOrb.scale.set(scale, scale, scale);
+                entityData.voidChargeOrb.material.opacity = 0.5 + chargeProgress * 0.45;
+                // Позиция — у пасти/рук Вордена: приподнята и смещена в сторону игрока
+                const toPlayerAngle = Math.atan2(playerY - enemy.y, playerX - enemy.x);
+                entityData.voidChargeOrb.position.set(
+                    enemy.x + Math.cos(toPlayerAngle) * 0.5,
+                    1.3,
+                    enemy.y + Math.sin(toPlayerAngle) * 0.5
+                );
+            }
         }
     });
 
@@ -1860,7 +1872,7 @@ function syncEntitiesWith3DScene() {
             if (val.healthBar) scene.remove(val.healthBar);
             if (val.laserBeam) scene.remove(val.laserBeam);
             if (val.warnRing) scene.remove(val.warnRing);
-            if (val.laserWarnLine) scene.remove(val.laserWarnLine);
+            if (val.voidChargeOrb) scene.remove(val.voidChargeOrb);
             entityMeshes.delete(id);
         }
     }
@@ -1950,7 +1962,7 @@ function returnToMainMenu() {
     shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
     meleeTier = 0; chainsawCharge = maxChainsawCharge; isChainsawActive = false; chainsawTickTimer = 0;
     grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
-    tracers.forEach(t => { if (scene) scene.remove(t.mesh); }); tracers = [];
+    tracers.forEach(t => { if (scene) { scene.remove(t.mesh); if (t.extraMesh) scene.remove(t.extraMesh); } }); tracers = [];
     enemies = []; projectiles = []; particles = []; pickups = [];
     WaveManager.reset();
     bossUi.style.display = "none"; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
@@ -2200,7 +2212,7 @@ function restartGame() {
     shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
     meleeTier = 0; chainsawCharge = maxChainsawCharge; isChainsawActive = false; chainsawTickTimer = 0;
     grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
-    tracers.forEach(t => { if (scene) scene.remove(t.mesh); }); tracers = [];
+    tracers.forEach(t => { if (scene) { scene.remove(t.mesh); if (t.extraMesh) scene.remove(t.extraMesh); } }); tracers = [];
     enemies = []; projectiles = []; particles = []; pickups = [];
     spawnMapCoins(MAX_MAP_COINS); coinRespawnTimer = COIN_RESPAWN_INTERVAL;
     bossUi.style.display = "none"; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
@@ -2735,39 +2747,99 @@ function fireGaussChargedShot(chargePct) {
     }
 }
 
-// ВИЗУАЛ: голубой электрический луч (ломаная линия со случайным дрожанием "разрядов").
-// Используется ВСЕМИ уровнями заряда — синий цвет луча одинаков независимо от режима выстрела.
+// ВИЗУАЛ: сплошной цилиндрический луч ("стеклянная трубка" с светящейся плазменной сердцевиной),
+// соединяющий дуло оружия с точкой попадания. Используется ВСЕМИ уровнями заряда — синий цвет
+// луча одинаков независимо от режима выстрела. Заменяет старую систему пиксельных линий-разрядов.
+// Собирает цилиндр вдоль оси Y и разворачивает его по направлению from->to при помощи кватерниона.
+function buildBeamCylinderMesh(start, end, radius, material) {
+    const dir = new THREE.Vector3().subVectors(end, start);
+    const len = Math.max(dir.length(), 0.001);
+    const geo = new THREE.CylinderGeometry(radius, radius, len, 12, 1, true); // openEnded: без видимых торцевых "крышек"
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.position.copy(start).addScaledVector(dir, 0.5); // центр цилиндра — середина отрезка
+    const up = new THREE.Vector3(0, 1, 0);
+    mesh.quaternion.setFromUnitVectors(up, dir.clone().normalize());
+    return mesh;
+}
 function spawnGaussBeam(origin, dir, length) {
     if (!scene) return;
     const muzzlePoint = origin.clone().addScaledVector(dir, 0.35).add(new THREE.Vector3(0, -0.05, 0));
     const endPoint = origin.clone().addScaledVector(dir, length);
-    const segmentCount = 7;
-    const points = [];
-    for (let i = 0; i <= segmentCount; i++) {
-        const t = i / segmentCount;
-        const p = muzzlePoint.clone().lerp(endPoint, t);
-        if (i > 0 && i < segmentCount) {
-            // случайное дрожание перпендикулярно лучу — создаёт вид электрического разряда
-            const jitter = (Math.random() - 0.5) * 0.06;
-            const jitter2 = (Math.random() - 0.5) * 0.06;
-            const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize();
-            const up = new THREE.Vector3().crossVectors(right, dir).normalize();
-            p.addScaledVector(right, jitter).addScaledVector(up, jitter2);
-        }
-        points.push(p);
-    }
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    const mat = new THREE.LineBasicMaterial({ color: 0x0000FF, transparent: true, opacity: 1.0 });
-    const line = new THREE.Line(geo, mat);
-    scene.add(line);
-    // Второй, более толстый и тусклый слой для эффекта свечения луча (ярко-синий/голубой)
-    const glowMat = new THREE.LineBasicMaterial({ color: 0x00BFFF, transparent: true, opacity: 0.45 });
-    const glowLine = new THREE.Line(geo.clone(), glowMat);
-    scene.add(glowLine);
-    tracers.push({ mesh: line, life: GAUSS_BEAM_LIFETIME, extraMesh: glowLine });
-}
-const GAUSS_BEAM_LIFETIME = 0.16;
 
+    // Внешняя "стеклянная трубка": широкая, полупрозрачная, слегка голубая оболочка плазмы
+    const glassMat = new THREE.MeshBasicMaterial({
+        color: 0x33CFFF, transparent: true, opacity: 0.35,
+        side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+    });
+    const glassTube = buildBeamCylinderMesh(muzzlePoint, endPoint, 0.09, glassMat);
+    scene.add(glassTube);
+
+    // Внутренняя светящаяся сердцевина: тонкая, яркая, почти белая — имитирует высокоэнергетическую плазму
+    const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xEAFBFF, transparent: true, opacity: 0.95,
+        side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+    });
+    const coreBeam = buildBeamCylinderMesh(muzzlePoint, endPoint, 0.025, coreMat);
+    scene.add(coreBeam);
+
+    // extraMesh переиспользует существующую инфраструктуру затухания трассеров (см. цикл обновления ниже):
+    // оба слоя одновременно плавно гаснут (fade-out) и удаляются со сцены через GAUSS_BEAM_LIFETIME секунд.
+    tracers.push({ mesh: glassTube, life: GAUSS_BEAM_LIFETIME, extraMesh: coreBeam });
+}
+const GAUSS_BEAM_LIFETIME = 0.2; // луч полностью исчезает через 0.2 секунды
+
+// ==========================================================================
+// БОСС "ВОРДЕН": ЛУЧ ПУСТОТЫ (дальняя атака) — логика полностью независима от
+// оружия игрока (своё состояние, свой урон, свой хитбокс), но переиспользует
+// ту же эффективную геометрию "стеклянной трубки" (buildBeamCylinderMesh) и
+// ту же инфраструктуру затухания трассеров (tracers[]), что и Гаусс-винтовка —
+// только в тёмно-фиолетовом/пустотном цвете, чтобы отличаться от оружия игрока.
+// ==========================================================================
+const WARDEN_BEAM_CHARGE_TIME = 0.5; // телеграф (заряд) перед выстрелом
+const WARDEN_BEAM_ACTIVE_TIME = 0.5; // время жизни луча = окно проверки попадания по игроку
+const WARDEN_BEAM_HIT_RADIUS = 0.5;  // радиус "трубки" для проверки контакта игрока с лучом
+const WARDEN_BEAM_DPS = 70;          // урон в секунду, пока игрок касается луча
+
+// Кратчайшее расстояние от точки (px,py) до отрезка (ax,ay)-(bx,by) на плоскости карты (XY).
+// Используется для хитбокса луча: контакт засчитывается, если игрок ближе WARDEN_BEAM_HIT_RADIUS.
+function distancePointToSegment2D(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    let t = lenSq > 0.0001 ? ((px - ax) * dx + (py - ay) * dy) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const cx = ax + dx * t, cy = ay + dy * t;
+    return Math.hypot(px - cx, py - cy);
+}
+
+// Выпускает СТАТИЧНЫЙ (не следящий за игроком) луч пустоты от пасти/рук Вордена к точке,
+// где находился игрок В МОМЕНТ ВЫСТРЕЛА — направление и длина фиксируются один раз при вызове,
+// как и предписано механикой "начинается от позиции босса и тянется к позиции игрока в момент
+// выстрела". Использует buildBeamCylinderMesh() — тот же геометрический подход, что и
+// spawnGaussBeam() у игрока, — но со своими цветами и временем жизни.
+function spawnWardenVoidBeam(from, to) {
+    if (!scene) return;
+
+    // Внешняя "стеклянная трубка": широкая, полупрозрачная оболочка пустотной энергии
+    const glassMat = new THREE.MeshBasicMaterial({
+        color: 0x8B2FE0, transparent: true, opacity: 0.35,
+        side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+    });
+    const glassTube = buildBeamCylinderMesh(from, to, 0.14, glassMat);
+    scene.add(glassTube);
+
+    // Внутренняя светящаяся сердцевина: тонкая, яркая, бледно-лиловая — высокоэнергетическая пустота
+    const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xE9CCFF, transparent: true, opacity: 0.95,
+        side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+    });
+    const coreBeam = buildBeamCylinderMesh(from, to, 0.04, coreMat);
+    scene.add(coreBeam);
+
+    // Переиспользуем существующую инфраструктуру затухания/удаления трассеров (см. цикл
+    // "ЗАТУХАНИЕ ТРАССЕРОВ ПУЛЬ"), но со своим временем жизни (lifetime), не зависящим от
+    // константы Гаусс-винтовки.
+    tracers.push({ mesh: glassTube, life: WARDEN_BEAM_ACTIVE_TIME, extraMesh: coreBeam, lifetime: WARDEN_BEAM_ACTIVE_TIME });
+}
 
 // КОНУСНЫЙ УРОН (для Огнемёта): наносит урон всем врагам в радиусе и в пределах угла обзора конуса
 function applyConeDamage(range, halfAngle, dmgPerSecond, dt, appliesBurning) {
@@ -3070,14 +3142,14 @@ function update(dt) {
     // ЗАТУХАНИЕ ТРАССЕРОВ ПУЛЬ
     tracers = tracers.filter(t => {
         t.life -= dt;
-        const lifetime = t.extraMesh ? GAUSS_BEAM_LIFETIME : TRACER_LIFETIME;
+        const lifetime = t.lifetime || (t.extraMesh ? GAUSS_BEAM_LIFETIME : TRACER_LIFETIME);
         if (t.life <= 0) {
             scene.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh.material.dispose();
             if (t.extraMesh) { scene.remove(t.extraMesh); t.extraMesh.geometry.dispose(); t.extraMesh.material.dispose(); }
             return false;
         }
-        t.mesh.material.opacity = Math.max(0, t.life / lifetime) * (t.extraMesh ? 1.0 : 0.9);
-        if (t.extraMesh) t.extraMesh.material.opacity = Math.max(0, t.life / lifetime) * 0.4;
+        t.mesh.material.opacity = Math.max(0, t.life / lifetime) * (t.extraMesh ? 0.35 : 0.9);
+        if (t.extraMesh) t.extraMesh.material.opacity = Math.max(0, t.life / lifetime) * 0.95;
         return true;
     });
 
@@ -3476,21 +3548,48 @@ function update(dt) {
                 } else {
                     // ВОРДЕН: цикл способностей
                     if (enemy.abilityState === 'idle' && enemy.abilityTimer <= 0) {
-                        enemy.abilityState = Math.random() < 0.5 ? 'laserWarn' : 'warn';
-                        if (enemy.abilityState === 'laserWarn') { enemy.abilityDuration = 1.0; showCenterMessage("ВОРДЕН: ЦЕЛИТСЯ ЛАЗЕРОМ..."); }
+                        enemy.abilityState = Math.random() < 0.5 ? 'voidCharge' : 'warn';
+                        if (enemy.abilityState === 'voidCharge') { enemy.abilityDuration = WARDEN_BEAM_CHARGE_TIME; showCenterMessage("ВОРДЕН: ЗАРЯЖАЕТ ЛУЧ ПУСТОТЫ..."); }
                         else { enemy.abilityDuration = 1.2; enemy.warnX = playerX; enemy.warnY = playerY; showCenterMessage("ВОРДЕН: ЗЕМЛЯНОЙ ВЗРЫВ!"); }
-                    } else if (enemy.abilityState === 'laserWarn') {
-                        // ТЕЛЕГРАФ: 1 секунда красной линии на земле, урон ещё НЕ наносится —
-                        // сам лазер активируется и начинает бить только после этой паузы.
+                    } else if (enemy.abilityState === 'voidCharge') {
+                        // ТЕЛЕГРАФ: 0.5 секунды пульсирующей сферы пустотной энергии у пасти Вордена
+                        // (визуал — см. entityData.voidChargeOrb в syncEntitiesWith3DScene). Урон ещё
+                        // НЕ наносится — луч выпускается и начинает бить только после этой паузы.
                         enemy.abilityDuration -= dt;
-                        if (enemy.abilityDuration <= 0) { enemy.abilityState = 'laser'; enemy.abilityDuration = 1.6; showCenterMessage("ВОРДЕН: СИНИЙ ЛАЗЕР!"); }
-                    } else if (enemy.abilityState === 'laser') {
-                        enemy.abilityDuration -= dt;
-                        if (enemyHasLineOfSight(enemy) && Math.hypot(playerX - enemy.x, playerY - enemy.y) < 16) {
-                            takeDamage(22 * dt);
-                            if (Math.random() < 0.15) { addDamageIndicator(Math.atan2(enemy.y - playerY, enemy.x - playerX)); spawnBlood(playerX, playerY, 1); }
+                        if (enemy.abilityDuration <= 0) {
+                            enemy.abilityState = 'voidBeam';
+                            enemy.abilityDuration = WARDEN_BEAM_ACTIVE_TIME;
+                            // Начало и конец луча фиксируются ИМЕННО в момент выстрела (не следящий
+                            // за игроком луч, в отличие от старого лазера) — от позиции босса к
+                            // позиции игрока на данный кадр.
+                            enemy.voidBeamFrom = { x: enemy.x, y: enemy.y };
+                            enemy.voidBeamTo = { x: playerX, y: playerY };
+                            const mouth = new THREE.Vector3(enemy.x, 1.3, enemy.y);
+                            const target = new THREE.Vector3(playerX, 0.75 + playerZ, playerY);
+                            spawnWardenVoidBeam(mouth, target);
+                            showCenterMessage("ВОРДЕН: ЛУЧ ПУСТОТЫ!");
+                            playPlasmaSound();
                         }
-                        if (enemy.abilityDuration <= 0) { enemy.abilityState = 'idle'; enemy.abilityTimer = 5 + Math.random() * 3; }
+                    } else if (enemy.abilityState === 'voidBeam') {
+                        enemy.abilityDuration -= dt;
+                        // ХИТБОКС: урон наносится, только если игрок физически касается цилиндра
+                        // луча (расстояние от игрока до зафиксированного отрезка не больше радиуса
+                        // "трубки"), а не по формальной проверке видимости, как раньше.
+                        if (enemy.voidBeamFrom && enemy.voidBeamTo) {
+                            const distToBeam = distancePointToSegment2D(
+                                playerX, playerY,
+                                enemy.voidBeamFrom.x, enemy.voidBeamFrom.y,
+                                enemy.voidBeamTo.x, enemy.voidBeamTo.y
+                            );
+                            if (distToBeam <= WARDEN_BEAM_HIT_RADIUS) {
+                                takeDamage(WARDEN_BEAM_DPS * dt);
+                                if (Math.random() < 0.25) { addDamageIndicator(Math.atan2(enemy.y - playerY, enemy.x - playerX)); spawnBlood(playerX, playerY, 1); }
+                            }
+                        }
+                        if (enemy.abilityDuration <= 0) {
+                            enemy.abilityState = 'idle'; enemy.abilityTimer = 5 + Math.random() * 3;
+                            enemy.voidBeamFrom = null; enemy.voidBeamTo = null;
+                        }
                     } else if (enemy.abilityState === 'warn') {
                         enemy.abilityDuration -= dt;
                         if (enemy.abilityDuration <= 0) {
