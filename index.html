@@ -828,6 +828,16 @@ let isMoving = false;
 
 let rifleFireRateTimer = 0;
 let minigunFireRateTimer = 0;
+// ПУЛЕМЁТ: балансировка разгона ствола / перегрева / инерции довращения (см. update() и executeShot())
+let minigunSpoolProgress = 0;   // 0 = ствол неподвижен, 1 = полностью разогнан (только тогда наносится урон)
+let minigunFiringTimer = 0;     // сколько секунд ПОДРЯД идёт стрельба на полных оборотах (для перегрева)
+let minigunOverheatTimer = 0;   // сек. до конца блокировки стрельбы после перегрева (0 = не перегрет)
+let minigunSpinDownTimer = 0;   // окно инерции после отпускания курка: пока > 0, повторное нажатие мгновенно возобновляет огонь
+let minigunWasHeld = false;     // для определения момента ОТПУСКАНИЯ курка (фронт по isMouseDown)
+const MINIGUN_SPOOLUP_TIME = 4.0;      // сек. на полный разгон ствола
+const MINIGUN_SPINDOWN_TIME = 3.0;     // сек. инерции довращения после отпускания курка
+const MINIGUN_OVERHEAT_THRESHOLD = 5.0; // сек. непрерывной стрельбы до перегрева
+const MINIGUN_OVERHEAT_DURATION = 10.0; // сек. блокировки стрельбы при перегреве
 let pistolFireRateTimer = 0;
 let flamethrowerTickTimer = 0;
 let meleeCooldownTimer = 0;
@@ -850,6 +860,10 @@ const BASE_SNIPER_DAMAGE = 220;
 const FLAMETHROWER_DPS = 45;
 const FLAMETHROWER_RANGE = 6.0;
 const FLAMETHROWER_CONE = 0.5; // радианы, половина угла конуса
+// ГОРЕНИЕ (DoT): статус, который огнемёт накладывает на врага при попадании.
+// Урон идёт независимо от того, стреляет ли игрок дальше или сменил оружие.
+const BURNING_DPS = 15;
+const BURNING_DURATION = 10; // секунд с момента ПОСЛЕДНЕГО попадания огнемётом
 
 // ТРАССЕРЫ ПУЛЬ (визуальный эффект Raycaster + LineBasicMaterial)
 let tracers = [];
@@ -933,7 +947,7 @@ const FLYING_DAMAGE_MULTIPLIER = 0.5;
 const BASE_SHOTGUN_DAMAGE = 40;
 const BASE_RIFLE_DAMAGE = 10;
 const BASE_ROCKET_DAMAGE = 100;
-const BASE_MINIGUN_DAMAGE = 5;
+const BASE_MINIGUN_DAMAGE = 5 * 5; // БАЛАНС: урон увеличен в 5 раз (компенсация за разгон ствола/перегрев)
 const BASE_MELEE_DAMAGE = 55; // урон Ножа
 const FIST_DAMAGE = 20; // урон Кулака (стартовое оружие)
 const MELEE_RANGE = 2.0;
@@ -1658,6 +1672,23 @@ function buildPickupMesh(type) {
 }
 
 function buildProjectileMesh() { return new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffcc00 })); }
+
+// КОСТЯНОЙ СНАРЯД СКЕЛЕТА-СТРЕЛКА: маленькая светящаяся "кость" (цилиндр-стержень + два
+// шарика-сустава по краям), хорошо заметная на фоне тёмных стен, чтобы игрок мог её увернуться.
+function buildEnemyProjectileMesh() {
+    const group = new THREE.Group();
+    const boneMat = new THREE.MeshStandardMaterial({ color: 0xf2ead6, emissive: 0xfff6d8, emissiveIntensity: 0.9, roughness: 0.4 });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.34, 6), boneMat);
+    shaft.rotation.z = Math.PI / 2; group.add(shaft);
+    const knobGeo = new THREE.SphereGeometry(0.07, 6, 6);
+    const knobA = new THREE.Mesh(knobGeo, boneMat); knobA.position.x = 0.17; group.add(knobA);
+    const knobB = new THREE.Mesh(knobGeo, boneMat); knobB.position.x = -0.17; group.add(knobB);
+    // Небольшое яркое ядро внутри — усиливает читаемость снаряда в полёте
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    group.add(glow);
+    group.renderOrder = 998;
+    return group;
+}
 function buildParticleMesh(color) { return new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), new THREE.MeshBasicMaterial({ color: color || 0xff9900 })); }
 function buildNetPlayerMesh(colorHex) {
     const group = new THREE.Group();
@@ -1772,6 +1803,19 @@ function syncEntitiesWith3DScene() {
         let mesh = entityMeshes.get(proj._meshId);
         if (!mesh) { mesh = buildProjectileMesh(); scene.add(mesh); entityMeshes.set(proj._meshId, mesh); }
         mesh.position.set(proj.x, proj.z, proj.y);
+    });
+
+    // КОСТЯНЫЕ СНАРЯДЫ СКЕЛЕТОВ: отрисовка + ориентация по направлению полёта + лёгкое
+    // кувыркание вокруг оси полёта, чтобы снаряд читался как летящий физический объект.
+    enemyProjectiles.forEach(proj => {
+        if (!proj._meshId) proj._meshId = 'ebolt_' + Math.random().toString(36).substr(2, 9);
+        activeMeshIds.add(proj._meshId);
+        let mesh = entityMeshes.get(proj._meshId);
+        if (!mesh) { mesh = buildEnemyProjectileMesh(); scene.add(mesh); entityMeshes.set(proj._meshId, mesh); }
+        mesh.position.set(proj.x, proj.z !== undefined ? proj.z : 0.9, proj.y);
+        const flatDir = Math.atan2(proj.vy, proj.vx);
+        mesh.rotation.set(0, -flatDir, 0);
+        mesh.rotation.z += time * 14; // кувыркание "кости" вокруг своей оси в полёте
     });
 
     thrownGrenades.forEach(g => {
@@ -1900,6 +1944,7 @@ function returnToMainMenu() {
     maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; maxPistolClip = 12; maxSniperClip = 5; maxFlamethrowerFuel = 100;
     shotgunClip = 2; rifleClip = 30; minigunClip = 100; pistolClip = 12; sniperClip = 5; flamethrowerFuel = 100;
     currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadingWeapon = null; reloadTimer = 0; meleeCooldownTimer = 0; pistolFireRateTimer = 0; flamethrowerTickTimer = 0; hardBossKillCount = 0;
+    resetMinigunState();
     weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
     gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
     shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
@@ -2137,6 +2182,7 @@ function restartGame() {
     if (multiplayer.enabled) {
         if (multiplayer.ws && multiplayer.ws.readyState === WebSocket.OPEN) multiplayer.ws.send(JSON.stringify({ type: 'respawn' }));
         playerZ = 0; playerVelZ = 0; isOnGround = true; ammo = 100; shotgunClip = maxShotgunClip; rifleClip = maxRifleClip; minigunClip = maxMinigunClip; isReloading = false; reloadingWeapon = null; reloadTimer = 0; meleeCooldownTimer = 0;
+        resetMinigunState();
         thrownGrenades = []; fireZones = [];
         projectiles = []; particles = []; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
         ammoUi.innerText = ammo; weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`; reloadUi.innerText = ""; gameState = 'PLAYING'; canvas.requestPointerLock();
@@ -2148,6 +2194,7 @@ function restartGame() {
     maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; maxPistolClip = 12; maxSniperClip = 5; maxFlamethrowerFuel = 100;
     shotgunClip = 2; rifleClip = 30; minigunClip = 100; pistolClip = 12; sniperClip = 5; flamethrowerFuel = 100;
     currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadingWeapon = null; reloadTimer = 0; meleeCooldownTimer = 0; pistolFireRateTimer = 0; flamethrowerTickTimer = 0; hardBossKillCount = 0;
+    resetMinigunState();
     weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
     gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
     shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
@@ -2422,7 +2469,11 @@ function executeShot(dt) {
             if (rifleClip <= 0 && ammo > 0 && !isReloading) startRifleReload();
         }
     } else if (currentWeapon === 'minigun') {
-        if (!(isReloading && reloadingWeapon === 'minigun') && minigunClip > 0 && ammo > 0 && minigunFireRateTimer <= 0) {
+        // РАЗГОН/ПЕРЕГРЕВ считаются каждый кадр в update() независимо от executeShot() —
+        // здесь только СТРЕЛЬБА: урон наносится ТОЛЬКО когда ствол разогнан на 100% (minigunSpoolProgress >= 1)
+        // и пулемёт не перегрет. До этого момента нажатие ЛКМ лишь копит разгон, без урона.
+        if (!(isReloading && reloadingWeapon === 'minigun') && minigunClip > 0 && ammo > 0 &&
+            minigunOverheatTimer <= 0 && minigunSpoolProgress >= 1 && minigunFireRateTimer <= 0) {
             isShooting = true; shootTimer = 0; minigunClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`;
             minigunFireRateTimer = 0.05; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.07, (BASE_MINIGUN_DAMAGE) * damageMultiplier);
@@ -2469,7 +2520,7 @@ function executeShot(dt) {
         if (!(isReloading && reloadingWeapon === 'sniper') && sniperClip > 0 && !isShooting && ammo > 0) {
             isShooting = true; shootTimer = 0; sniperClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `СНАЙПЕРКА [6] (${sniperClip}/${maxSniperClip})`;
-            playRocketLaunchSound(); triggerMuzzleFlash(); checkHit(0.015, (BASE_SNIPER_DAMAGE) * damageMultiplier, 40);
+            playRocketLaunchSound(); triggerMuzzleFlash(); checkHit(0.015, (BASE_SNIPER_DAMAGE) * damageMultiplier, SNIPER_MAX_RANGE, true, 'sniper');
             if (sniperClip <= 0 && ammo > 0 && !isReloading) startSniperReload();
         }
     } else if (currentWeapon === 'flamethrower') {
@@ -2477,7 +2528,7 @@ function executeShot(dt) {
         if (!(isReloading && reloadingWeapon === 'flamethrower') && flamethrowerFuel > 0) {
             isShooting = true; shootTimer = 0;
             flamethrowerFuel = Math.max(0, flamethrowerFuel - 22 * dt);
-            applyConeDamage(FLAMETHROWER_RANGE, FLAMETHROWER_CONE, (FLAMETHROWER_DPS) * damageMultiplier, dt);
+            applyConeDamage(FLAMETHROWER_RANGE, FLAMETHROWER_CONE, (FLAMETHROWER_DPS) * damageMultiplier, dt, true);
             flamethrowerTickTimer -= dt;
             if (flamethrowerTickTimer <= 0) { flamethrowerTickTimer = 0.05; playPlasmaSound(); spawnFlameParticles(); triggerMuzzleFlash(); }
             weaponUi.innerText = `ОГНЕМЁТ [7] (${Math.ceil(flamethrowerFuel)}/${maxFlamethrowerFuel})`;
@@ -2719,7 +2770,7 @@ const GAUSS_BEAM_LIFETIME = 0.16;
 
 
 // КОНУСНЫЙ УРОН (для Огнемёта): наносит урон всем врагам в радиусе и в пределах угла обзора конуса
-function applyConeDamage(range, halfAngle, dmgPerSecond, dt) {
+function applyConeDamage(range, halfAngle, dmgPerSecond, dt, appliesBurning) {
     enemies.forEach(enemy => {
         const dx = enemy.x - playerX; const dy = enemy.y - playerY; const dist = Math.hypot(dx, dy);
         if (dist > range) return;
@@ -2731,6 +2782,9 @@ function applyConeDamage(range, halfAngle, dmgPerSecond, dt) {
         enemy.health -= dmg; spawnBlood(enemy.x, enemy.y, dmg / 5);
         if (enemy.type === 'boss') bossHpUi.innerText = Math.max(0, Math.floor(enemy.health));
         if (multiplayer.enabled && enemy.id) sendNetworkHit(enemy.id, dmg);
+        // СТАТУС "ГОРЕНИЕ": только огнемёт поджигает цель. Каждое новое попадание
+        // СБРАСЫВАЕТ таймер горения обратно на полную длительность (не складывается).
+        if (appliesBurning) enemy.burningTimer = BURNING_DURATION;
     });
     const distToPlayerIrrelevant = null; // огнемёт не наносит урон игроку-стрелку
 }
@@ -2787,6 +2841,12 @@ function startRifleReload() {
     if (currentWeapon === 'rifle') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
     playReloadSound(); updateWeaponVisibility();
 }
+// СБРОС СОСТОЯНИЯ ПУЛЕМЁТА (разгон/перегрев/инерция) — вызывается при старте новой игры,
+// рестарте и респауне, чтобы перегрев/остаточная инерция не переносились между жизнями.
+function resetMinigunState() {
+    minigunSpoolProgress = 0; minigunFiringTimer = 0; minigunOverheatTimer = 0;
+    minigunSpinDownTimer = 0; minigunWasHeld = false;
+}
 function startMinigunReload() {
     isReloading = true; reloadingWeapon = 'minigun'; reloadTimer = 2.6; reloadTotalDuration = 2.6;
     if (currentWeapon === 'minigun') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
@@ -2809,7 +2869,35 @@ function startFlamethrowerRefuel() {
     playReloadSound(); updateWeaponVisibility();
 }
 
-function checkHit(fovSpread, damage, maxRange, useTracer) {
+// СНАЙПЕРСКАЯ ВИНТОВКА: дальность и урон, зависящий от дистанции до цели.
+// Дальность увеличена на 20% относительно прежнего значения (40 -> 48).
+const SNIPER_BASE_RANGE = 40;
+const SNIPER_MAX_RANGE = SNIPER_BASE_RANGE * 1.2; // +20% дальности
+const SNIPER_CLOSE_DIST = 10;   // ближе этой дистанции — множитель 0.5x
+const SNIPER_LONG_DIST = 40;    // дальше этой дистанции — множитель 1.5x
+const SNIPER_CLOSE_MULTIPLIER = 0.5;
+const SNIPER_LONG_MULTIPLIER = 1.5;
+
+// РАСЧЁТ УРОНА С УЧЁТОМ ДИСТАНЦИИ: применяется ТОЛЬКО к снайперской винтовке —
+// остальное оружие получает свой baseDamage без изменений. position/targetPosition —
+// THREE.Vector3, дистанция считается через position.distanceTo(targetPosition).
+function calculateDamage(baseDamage, position, targetPosition, weaponType) {
+    if (weaponType !== 'sniper') return baseDamage;
+    const distance = position.distanceTo(targetPosition);
+    let multiplier;
+    if (distance < SNIPER_CLOSE_DIST) {
+        multiplier = SNIPER_CLOSE_MULTIPLIER;
+    } else if (distance > SNIPER_LONG_DIST) {
+        multiplier = SNIPER_LONG_MULTIPLIER;
+    } else {
+        // Линейная интерполяция множителя от 0.5x (10 юнитов) до 1.5x (40 юнитов)
+        const t = (distance - SNIPER_CLOSE_DIST) / (SNIPER_LONG_DIST - SNIPER_CLOSE_DIST);
+        multiplier = SNIPER_CLOSE_MULTIPLIER + t * (SNIPER_LONG_MULTIPLIER - SNIPER_CLOSE_MULTIPLIER);
+    }
+    return baseDamage * multiplier;
+}
+
+function checkHit(fovSpread, damage, maxRange, useTracer, weaponType) {
     maxRange = maxRange || Infinity;
     if (useTracer === undefined) useTracer = true;
     const rayAngle = playerAngle; let hitTarget = null; let minEnemyDist = Infinity;
@@ -2842,10 +2930,13 @@ function checkHit(fovSpread, damage, maxRange, useTracer) {
     });
 
     if (hitTarget) {
-        hitTarget.health -= damage; spawnBlood(hitTarget.x, hitTarget.y, damage / 2);
+        const shooterPos = new THREE.Vector3(playerX, playerZ, playerY);
+        const targetPos = new THREE.Vector3(hitTarget.x, hitTarget.z || 0, hitTarget.y);
+        const finalDamage = calculateDamage(damage, shooterPos, targetPos, weaponType);
+        hitTarget.health -= finalDamage; spawnBlood(hitTarget.x, hitTarget.y, finalDamage / 2);
         if (hitTarget.type === 'boss') bossHpUi.innerText = Math.max(0, Math.floor(hitTarget.health));
         hitTarget.x -= Math.cos(playerAngle) * 0.12; hitTarget.y -= Math.sin(playerAngle) * 0.12;
-        if (multiplayer.enabled && hitTarget.id) sendNetworkHit(hitTarget.id, damage);
+        if (multiplayer.enabled && hitTarget.id) sendNetworkHit(hitTarget.id, finalDamage);
     }
     // ТРАССЕР ПУЛИ: показываем визуальный след выстрела до цели или на максимальную дальность
     if (useTracer) spawnTracer(hitTarget ? minEnemyDist : (maxRange !== Infinity ? maxRange : 25));
@@ -2999,7 +3090,49 @@ function update(dt) {
     if (minigunFireRateTimer > 0) minigunFireRateTimer -= dt;
     if (pistolFireRateTimer > 0) pistolFireRateTimer -= dt;
     if (meleeCooldownTimer > 0) meleeCooldownTimer -= dt;
+
+    // ПУЛЕМЁТ: разгон ствола (4с) / перегрев (>5с непрерывной стрельбы -> блок на 10с) / инерция
+    // довращения (3с после отпускания курка, повторное нажатие в этом окне возобновляет огонь мгновенно).
+    // Считается КАЖДЫЙ кадр независимо от executeShot(), чтобы инерция отрабатывала и когда ЛКМ отпущена.
+    if (minigunOverheatTimer > 0) { minigunOverheatTimer -= dt; if (minigunOverheatTimer < 0) minigunOverheatTimer = 0; }
+    const minigunWantsSpool = isMouseDown && currentWeapon === 'minigun' && gameState === 'PLAYING' && health > 0 &&
+        minigunOverheatTimer <= 0 && !(isReloading && reloadingWeapon === 'minigun') && minigunClip > 0 && ammo > 0;
+    if (minigunWantsSpool) {
+        if (!minigunWasHeld && minigunSpinDownTimer > 0) {
+            // Курок нажат повторно ДО того, как ствол полностью остановился — мгновенный разгон,
+            // 4-секундный спул-ап в этом случае полностью пропускается.
+            minigunSpoolProgress = 1;
+        }
+        minigunSpoolProgress = Math.min(1, minigunSpoolProgress + dt / MINIGUN_SPOOLUP_TIME);
+        minigunSpinDownTimer = 0; minigunWasHeld = true;
+        if (minigunSpoolProgress >= 1) {
+            minigunFiringTimer += dt;
+            if (minigunFiringTimer >= MINIGUN_OVERHEAT_THRESHOLD) {
+                minigunOverheatTimer = MINIGUN_OVERHEAT_DURATION; minigunFiringTimer = 0;
+                showCenterMessage("ПУЛЕМЁТ ПЕРЕГРЕЛСЯ! ОСТЫВАНИЕ...");
+            }
+        }
+    } else {
+        if (minigunWasHeld) {
+            minigunSpinDownTimer = MINIGUN_SPINDOWN_TIME; // курок только что отпущен (или сработал перегрев) — запускаем окно инерции
+        }
+        minigunWasHeld = false; minigunFiringTimer = 0;
+        if (minigunSpinDownTimer > 0) {
+            minigunSpinDownTimer = Math.max(0, minigunSpinDownTimer - dt);
+            minigunSpoolProgress = Math.max(0, minigunSpoolProgress - dt / MINIGUN_SPINDOWN_TIME);
+        } else {
+            minigunSpoolProgress = 0;
+        }
+    }
+
     if (isShooting) { shootTimer += dt * 16; if (shootTimer > 4) isShooting = false; }
+
+    // Индикатор состояния пулемёта (переиспользуем существующий reloadUi, как и для остальных
+    // видов перезарядки/заправки) — показывает разгон ствола и перегрев в реальном времени.
+    if (currentWeapon === 'minigun' && !(isReloading && reloadingWeapon === 'minigun')) {
+        reloadUi.innerText = minigunOverheatTimer > 0 ? "(ПЕРЕГРЕВ...)" :
+            (minigunSpoolProgress > 0 && minigunSpoolProgress < 1 ? "(РАЗГОН СТВОЛА...)" : "");
+    }
     walkCycle += isMoving ? dt * 11 : 0;
 
     // ЗАТУХАНИЕ ВСПЫШКИ ВЫСТРЕЛА
@@ -3132,6 +3265,12 @@ function update(dt) {
                 if (Math.random() < 0.4) playHurtSound();
                 return false;
             }
+            // ЛЁГКИЙ БЕЛЫЙ СЛЕД: помогает игроку визуально отследить траекторию и вовремя увернуться
+            p.trailTimer -= dt;
+            if (p.trailTimer <= 0) {
+                p.trailTimer = 0.03;
+                particles.push({ x: p.x, y: p.y, z: (p.z || 0.9), vx: 0, vy: 0, vz: 0, color: 0xfff6d8, size: 2, life: 0.18, type: 'boneTrail' });
+            }
             return true;
         });
     }
@@ -3241,6 +3380,17 @@ function update(dt) {
                 scoreUi.innerText = score; return false;
             }
 
+            // ГОРЕНИЕ (DoT ОТ ОГНЕМЁТА): тикает КАЖДЫЙ кадр независимо от того, стреляет ли
+            // игрок дальше, сменил оружие или враг оглушён — таймер отсчитывает 10 секунд
+            // с момента последнего попадания огнемётом, после чего статус снимается.
+            if (enemy.burningTimer > 0) {
+                enemy.burningTimer -= dt;
+                enemy.health -= BURNING_DPS * dt;
+                if (Math.random() < 0.3) spawnBlood(enemy.x, enemy.y, 1); // лёгкая обгорающая искра
+                if (enemy.type === 'boss') bossHpUi.innerText = Math.max(0, Math.floor(enemy.health));
+                if (enemy.burningTimer < 0) enemy.burningTimer = 0;
+            }
+
             // СВЕТОШУМОВАЯ ГРАНАТА: враг оглушён - не двигается и не атакует
             if (enemy.stunTimer > 0) {
                 enemy.stunTimer -= dt;
@@ -3261,9 +3411,9 @@ function update(dt) {
                     const angleToPlayer = Math.atan2(playerY - enemy.y, playerX - enemy.x);
                     const projSpeed = 7.5;
                     enemyProjectiles.push({
-                        x: enemy.x + Math.cos(angleToPlayer) * 0.4, y: enemy.y + Math.sin(angleToPlayer) * 0.4,
+                        x: enemy.x + Math.cos(angleToPlayer) * 0.4, y: enemy.y + Math.sin(angleToPlayer) * 0.4, z: 0.9,
                         vx: Math.cos(angleToPlayer) * projSpeed, vy: Math.sin(angleToPlayer) * projSpeed,
-                        life: 2.5, damage: 12
+                        life: 2.5, damage: 12, trailTimer: 0
                     });
                     playPlasmaSound();
                 }
@@ -3459,7 +3609,11 @@ function render3D() {
         else { recoilZ = Math.sin(shootTimer * 3) * 0.06; recoilY = Math.sin(shootTimer * 3) * 0.02; }
     }
     if (weaponMeshes.minigunBarrels) {
-        weaponMeshes.minigunBarrels.rotation.z += (currentWeapon === 'minigun' && isShooting ? 0.9 : 0.08);
+        // ВИЗУАЛ РАЗГОНА/ТОРМОЖЕНИЯ: скорость вращения ствола плавно следует за minigunSpoolProgress —
+        // 4 секунды на разгон до максимума, до 3 секунд на плавное торможение после отпускания курка.
+        const idleSpin = 0.08, maxSpin = 0.9;
+        const spinRate = (currentWeapon === 'minigun') ? (idleSpin + (maxSpin - idleSpin) * minigunSpoolProgress) : idleSpin;
+        weaponMeshes.minigunBarrels.rotation.z += spinRate;
     }
     // АНИМАЦИЯ ТЕКУЩЕГО УРОВНЯ ОРУЖИЯ БЛИЖНЕГО БОЯ (Кулак / Нож / Бензопила)
     const activeMeleeMesh = meleeTier === 0 ? weaponMeshes.fist : (meleeTier === 1 ? weaponMeshes.knife : weaponMeshes.chainsaw);
