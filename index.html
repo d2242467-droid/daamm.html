@@ -2458,7 +2458,7 @@ function executeShot(dt) {
         if (!(isReloading && reloadingWeapon === 'shotgun') && shotgunClip > 0 && !isShooting && ammo > 0) {
             isShooting = true; shootTimer = 0; shotgunClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`;
-            playShotgunSound(); triggerMuzzleFlash(); checkHit(0.18, (BASE_SHOTGUN_DAMAGE) * damageMultiplier);
+            playShotgunSound(); triggerMuzzleFlash(); checkHit(0.18, (BASE_SHOTGUN_DAMAGE) * damageMultiplier, undefined, true, 'shotgun');
             if (shotgunClip <= 0 && ammo > 0 && !isReloading) startShotgunReload();
         }
     } else if (currentWeapon === 'rifle') {
@@ -2878,23 +2878,46 @@ const SNIPER_LONG_DIST = 40;    // дальше этой дистанции — 
 const SNIPER_CLOSE_MULTIPLIER = 0.5;
 const SNIPER_LONG_MULTIPLIER = 1.5;
 
-// РАСЧЁТ УРОНА С УЧЁТОМ ДИСТАНЦИИ: применяется ТОЛЬКО к снайперской винтовке —
-// остальное оружие получает свой baseDamage без изменений. position/targetPosition —
-// THREE.Vector3, дистанция считается через position.distanceTo(targetPosition).
+// ДРОБОВИК: убойная сила в упор + резкий спад урона на дистанции.
+const SHOTGUN_POINT_BLANK_DIST = 5;   // ближе этой дистанции — множитель 5x
+const SHOTGUN_FALLOFF_DIST = 15;      // дальше этой дистанции — множитель 0.1x (10% урона)
+const SHOTGUN_POINT_BLANK_MULTIPLIER = 5.0;
+const SHOTGUN_FALLOFF_MULTIPLIER = 0.1;
+
+// РАСЧЁТ УРОНА С УЧЁТОМ ДИСТАНЦИИ: множители применяются ТОЛЬКО к своему оружию —
+// снайперка и дробовик считаются НЕЗАВИСИМО друг от друга (взаимоисключающие ветки
+// по weaponType), остальное оружие получает свой baseDamage без изменений. position/
+// targetPosition — THREE.Vector3, дистанция считается через position.distanceTo(targetPosition).
 function calculateDamage(baseDamage, position, targetPosition, weaponType) {
-    if (weaponType !== 'sniper') return baseDamage;
-    const distance = position.distanceTo(targetPosition);
-    let multiplier;
-    if (distance < SNIPER_CLOSE_DIST) {
-        multiplier = SNIPER_CLOSE_MULTIPLIER;
-    } else if (distance > SNIPER_LONG_DIST) {
-        multiplier = SNIPER_LONG_MULTIPLIER;
-    } else {
-        // Линейная интерполяция множителя от 0.5x (10 юнитов) до 1.5x (40 юнитов)
-        const t = (distance - SNIPER_CLOSE_DIST) / (SNIPER_LONG_DIST - SNIPER_CLOSE_DIST);
-        multiplier = SNIPER_CLOSE_MULTIPLIER + t * (SNIPER_LONG_MULTIPLIER - SNIPER_CLOSE_MULTIPLIER);
+    if (weaponType === 'sniper') {
+        const distance = position.distanceTo(targetPosition);
+        let multiplier;
+        if (distance < SNIPER_CLOSE_DIST) {
+            multiplier = SNIPER_CLOSE_MULTIPLIER;
+        } else if (distance > SNIPER_LONG_DIST) {
+            multiplier = SNIPER_LONG_MULTIPLIER;
+        } else {
+            // Линейная интерполяция множителя от 0.5x (10 юнитов) до 1.5x (40 юнитов)
+            const t = (distance - SNIPER_CLOSE_DIST) / (SNIPER_LONG_DIST - SNIPER_CLOSE_DIST);
+            multiplier = SNIPER_CLOSE_MULTIPLIER + t * (SNIPER_LONG_MULTIPLIER - SNIPER_CLOSE_MULTIPLIER);
+        }
+        return baseDamage * multiplier;
     }
-    return baseDamage * multiplier;
+    if (weaponType === 'shotgun') {
+        const distance = position.distanceTo(targetPosition);
+        let multiplier;
+        if (distance < SHOTGUN_POINT_BLANK_DIST) {
+            multiplier = SHOTGUN_POINT_BLANK_MULTIPLIER;
+        } else if (distance > SHOTGUN_FALLOFF_DIST) {
+            multiplier = SHOTGUN_FALLOFF_MULTIPLIER;
+        } else {
+            // Линейная интерполяция множителя от 5x (5 юнитов) до 0.1x (15 юнитов) — резкий спад
+            const t = (distance - SHOTGUN_POINT_BLANK_DIST) / (SHOTGUN_FALLOFF_DIST - SHOTGUN_POINT_BLANK_DIST);
+            multiplier = SHOTGUN_POINT_BLANK_MULTIPLIER + t * (SHOTGUN_FALLOFF_MULTIPLIER - SHOTGUN_POINT_BLANK_MULTIPLIER);
+        }
+        return baseDamage * multiplier;
+    }
+    return baseDamage;
 }
 
 function checkHit(fovSpread, damage, maxRange, useTracer, weaponType) {
