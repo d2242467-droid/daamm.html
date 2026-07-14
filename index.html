@@ -1034,7 +1034,57 @@ function makeProceduralNoiseTexture(colorBase, countX=16, countY=16) {
     return texture;
 }
 
+// ТЕКСТУРА БОССА-ВОРДЕНА (пиксель-арт 64x64): тёмный сланцево-синий/чёрный фон,
+// биолюминесцентные голубые пятна (гуще у "рогов" сверху и в области груди),
+// костяно-белые полосы рёбер в грудной зоне. Используется на ЛЁГКОЙ и СРЕДНЕЙ сложности.
+function makeWardenTexture() {
+    const size = 64; const grid = 32; const cell = size / grid;
+    const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    for (let gx = 0; gx < grid; gx++) {
+        for (let gy = 0; gy < grid; gy++) {
+            let r, g, b;
+            if (Math.random() < 0.6) { r = 10 + Math.random() * 10; g = 14 + Math.random() * 10; b = 24 + Math.random() * 16; }
+            else { r = 3; g = 5; b = 9; }
+            const inChest = gy > grid * 0.35 && gy < grid * 0.68 && gx > grid * 0.28 && gx < grid * 0.72;
+            const inHorns = gy < grid * 0.16 && (gx < grid * 0.32 || gx > grid * 0.68);
+            if ((inChest || inHorns) && Math.random() < 0.22) { r = 0; g = 200 + Math.random() * 55; b = 220 + Math.random() * 35; }
+            if (inChest && (gy % 4 === 0) && Math.random() < 0.5) { r = 210 + Math.random() * 30; g = 205 + Math.random() * 30; b = 190 + Math.random() * 25; }
+            ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+            ctx.fillRect(gx * cell, gy * cell, cell, cell);
+        }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestFilter;
+    return texture;
+}
+
+// ТЕКСТУРА ФАНТОМА (пиксель-арт 64x64): тёмно-синий/серый кожистый узор с редкими
+// более тёмными "трещинами" для эффекта потрёпанных крыльев. Используется для
+// обычных летающих врагов (type === 'flyer').
+function makePhantomTexture() {
+    const size = 64; const grid = 32; const cell = size / grid;
+    const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    for (let gx = 0; gx < grid; gx++) {
+        for (let gy = 0; gy < grid; gy++) {
+            let r, g, b; const n = Math.random();
+            if (n < 0.5) { r = 35 + Math.random() * 15; g = 42 + Math.random() * 15; b = 52 + Math.random() * 18; }
+            else if (n < 0.8) { r = 20 + Math.random() * 10; g = 25 + Math.random() * 10; b = 32 + Math.random() * 12; }
+            else { r = 55; g = 62; b = 72; }
+            if (Math.random() < 0.06) { r *= 0.3; g *= 0.3; b *= 0.3; }
+            ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+            ctx.fillRect(gx * cell, gy * cell, cell, cell);
+        }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestFilter;
+    return texture;
+}
+
 function initTextures() {
+    textures.warden = makeWardenTexture();
+    textures.phantom = makePhantomTexture();
     textures[1] = makeProceduralNoiseTexture({ r: 90, g: 90, b: 90 }, 8, 8);
     textures[2] = makeProceduralNoiseTexture({ r: 93, g: 64, b: 55 }, 4, 16);
     textures[3] = makeProceduralNoiseTexture({ r: 46, g: 125, b: 50 }, 8, 8);
@@ -1482,14 +1532,33 @@ function buildEnemyMesh(type, isFlyingBoss) {
             eyeL.material.color.setRGB(0.8, 0.4 * pulse, 1); eyeR.material.color.copy(eyeL.material.color);
         };
     } else if (type === 'boss') {
-        const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.8, 0.8), new THREE.MeshLambertMaterial({ color: 0x12131c }));
+        // НАЗЕМНЫЙ БОСС (ЛЕГКО/СРЕДНЕ), ВОРДЕН-СТИЛЬ: тёмный сланцево-синий/чёрный
+        // пиксель-арт корпус (textures.warden), биолюминесцентные голубые рога и
+        // грудная полость, костяно-белые полосы рёбер поверх груди.
+        const wardenMat = new THREE.MeshLambertMaterial({ map: textures.warden, color: 0xffffff });
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.8, 0.8), wardenMat);
         torso.position.y = 0.9; group.add(torso);
-        const innerCore = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.9), new THREE.MeshLambertMaterial({ color: 0x00fff2, emissive: 0x0088cc }));
+        const innerCore = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.9), new THREE.MeshLambertMaterial({ color: 0x00fff2, emissive: 0x0088cc, emissiveIntensity: 1.1 }));
         innerCore.position.set(0, 1.0, 0.05); group.add(innerCore);
-        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.2, 0.3), new THREE.MeshLambertMaterial({ color: 0x0a0b12 }));
+        // РЁБРА: костяно-белые полосы поверх грудной полости
+        const ribGeom = new THREE.BoxGeometry(1.0, 0.06, 0.85);
+        const ribMat = new THREE.MeshLambertMaterial({ color: 0xe8e2d0 });
+        const rib1 = new THREE.Mesh(ribGeom, ribMat); rib1.position.set(0, 1.28, 0.02); group.add(rib1);
+        const rib2 = new THREE.Mesh(ribGeom, ribMat); rib2.position.set(0, 1.12, 0.02); group.add(rib2);
+        const rib3 = new THREE.Mesh(ribGeom, ribMat); rib3.position.set(0, 0.96, 0.02); group.add(rib3);
+        // РОГА: голубые светящиеся шипы на голове, пульсирующие в такт с ядром
+        const hornGeom = new THREE.ConeGeometry(0.09, 0.4, 5);
+        const hornMat = new THREE.MeshLambertMaterial({ color: 0x0a2530, emissive: 0x00e5ff, emissiveIntensity: 0.8 });
+        const hornL = new THREE.Mesh(hornGeom, hornMat); hornL.position.set(-0.28, 1.95, 0); hornL.rotation.z = 0.35; group.add(hornL);
+        const hornR = new THREE.Mesh(hornGeom, hornMat); hornR.position.set(0.28, 1.95, 0); hornR.rotation.z = -0.35; group.add(hornR);
+        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.2, 0.3), wardenMat);
         leftArm.position.set(-0.75, 0.8, 0); group.add(leftArm);
         const rightArm = leftArm.clone(); rightArm.position.x = 0.75; group.add(rightArm);
-        animator = (time) => { leftArm.rotation.x = Math.sin(time * 8) * 0.3; rightArm.rotation.x = -Math.sin(time * 8) * 0.3; innerCore.rotation.y = time * 2; };
+        animator = (time) => {
+            leftArm.rotation.x = Math.sin(time * 8) * 0.3; rightArm.rotation.x = -Math.sin(time * 8) * 0.3;
+            innerCore.rotation.y = time * 2;
+            hornMat.emissiveIntensity = 0.7 + Math.sin(time * 3) * 0.3;
+        };
     } else if (type === 'creeper') {
         const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), new THREE.MeshLambertMaterial({ color: 0x1b8a1b }));
         head.position.y = 0.7; group.add(head);
@@ -1516,11 +1585,32 @@ function buildEnemyMesh(type, isFlyingBoss) {
         blaster.position.set(0.16, 0.4, 0.1); group.add(blaster);
         animator = (time) => { blaster.position.y = 0.4 + Math.sin(time * 6) * 0.02; };
     } else if (type === 'flyer') {
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.35), new THREE.MeshLambertMaterial({ color: 0x5c6e62 }));
+        // ФАНТОМ-СТИЛЬ: тёмно-синие/серые рваные кожистые крылья (textures.phantom),
+        // светящиеся зелёные глаза, полупрозрачное "призрачное" тело.
+        const wingMat = new THREE.MeshLambertMaterial({ map: textures.phantom, color: 0xffffff, transparent: true, opacity: 0.88 });
+        const bodyMat = new THREE.MeshLambertMaterial({ map: textures.phantom, color: 0xcfd8e0, transparent: true, opacity: 0.9 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.38), bodyMat);
         body.position.y = 0.5; group.add(body);
-        const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.2), new THREE.MeshLambertMaterial({ color: 0x4a5850 }));
-        wingL.position.set(-0.3, 0.5, 0); group.add(wingL); const wingR = wingL.clone(); wingR.position.x = 0.3; group.add(wingR);
-        animator = (time) => { const wingFlap = Math.sin(time * 12) * 0.6; wingL.rotation.z = wingFlap; wingR.rotation.z = -wingFlap; };
+        const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.02), new THREE.MeshBasicMaterial({ color: 0x33ff55 }));
+        eyeL.position.set(-0.06, 0.53, 0.19); group.add(eyeL); const eyeR = eyeL.clone(); eyeR.position.x = 0.06; group.add(eyeR);
+        const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.22), wingMat);
+        wingL.position.set(-0.32, 0.5, 0); group.add(wingL);
+        // РВАНЫЕ КРАЯ КРЫЛЬЕВ: мелкие смещённые сегменты для эффекта потрёпанности
+        const tatterL1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.1), wingMat);
+        tatterL1.position.set(-0.52, 0.47, 0.08); tatterL1.rotation.y = 0.3; group.add(tatterL1);
+        const tatterL2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 0.08), wingMat);
+        tatterL2.position.set(-0.5, 0.47, -0.09); tatterL2.rotation.y = -0.25; group.add(tatterL2);
+        const wingR = wingL.clone(); wingR.position.x = 0.32; group.add(wingR);
+        const tatterR1 = tatterL1.clone(); tatterR1.position.x = 0.52; group.add(tatterR1);
+        const tatterR2 = tatterL2.clone(); tatterR2.position.x = 0.5; group.add(tatterR2);
+        animator = (time) => {
+            const wingFlap = Math.sin(time * 12) * 0.6;
+            wingL.rotation.z = wingFlap; wingR.rotation.z = -wingFlap;
+            tatterL1.rotation.z = wingFlap; tatterL2.rotation.z = wingFlap;
+            tatterR1.rotation.z = -wingFlap; tatterR2.rotation.z = -wingFlap;
+            const eyePulse = 0.5 + Math.sin(time * 6) * 0.5;
+            eyeL.material.color.setRGB(0.2, 0.6 + eyePulse * 0.4, 0.3); eyeR.material.color.copy(eyeL.material.color);
+        };
     }
     // ПОЛОСКА ЗДОРОВЬЯ: НЕ добавляется как child этой group. group.rotation.y крутится каждый
     // кадр лицом к игроку (см. syncEntitiesWith3DScene) — если бар был бы её ребёнком, его
