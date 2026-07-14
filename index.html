@@ -442,6 +442,11 @@
             <button class="btn" onclick="restartGame()">ВОЗРОДИТЬСЯ</button>
         </div>
 
+        <div id="pause-overlay" class="overlay" style="display: none;">
+            <h1>ПАУЗА</h1>
+            <button class="btn" style="background: #7209b7; box-shadow: 0 5px 0 #430a6b;" onclick="returnToMainMenu()">ГЛАВНОЕ МЕНЮ</button>
+        </div>
+
         <canvas id="gameCanvas"></canvas>
         <canvas id="minimapCanvas" width="150" height="150" class="absolute top-3 right-3 border-2 border-[#ff0055] rounded-md bg-black/80 z-20"></canvas>
     </div>
@@ -1852,7 +1857,7 @@ function sendNetworkHit(enemyId, damage) {
 }
 
 function toggleShop() {
-    if (gameState === 'START' || gameState === 'GAMEOVER') return;
+    if (gameState === 'START' || gameState === 'GAMEOVER' || gameState === 'PAUSED') return;
     if (multiplayer.enabled) { showCenterMessage('Магазин недоступен в сети'); return; }
     if (gameState === 'PLAYING') {
         gameState = 'SHOP'; document.exitPointerLock(); updateShopUI();
@@ -1861,6 +1866,52 @@ function toggleShop() {
         gameState = 'PLAYING'; document.getElementById("shop-overlay").style.display = "none";
         canvas.requestPointerLock();
     }
+}
+
+// МЕНЮ ПАУЗЫ (клавиша Esc): работает по той же логике переключения состояний, что и
+// магазин (toggleShop) — переводит gameState между 'PLAYING' и 'PAUSED', показывает/прячет
+// оверлей и снимает/восстанавливает захват курсора. Не открывается, пока открыт магазин
+// (и наоборот — см. guard в toggleShop выше), не работает на стартовом экране/экране смерти.
+function togglePause() {
+    if (gameState === 'START' || gameState === 'GAMEOVER' || gameState === 'SHOP') return;
+    if (gameState === 'PLAYING') {
+        gameState = 'PAUSED'; document.exitPointerLock();
+        document.getElementById("pause-overlay").style.display = "flex";
+    } else if (gameState === 'PAUSED') {
+        gameState = 'PLAYING'; document.getElementById("pause-overlay").style.display = "none";
+        canvas.requestPointerLock();
+    }
+}
+
+// КНОПКА "ГЛАВНОЕ МЕНЮ" В МЕНЮ ПАУЗЫ: полностью сбрасывает состояние текущего забега
+// (счёт, волну, здоровье, оружие, врагов и т.д. — тот же набор, что и restartGame()) и
+// возвращает игрока на стартовый экран выбора карты и сложности, вместо немедленного
+// возобновления боя.
+function returnToMainMenu() {
+    document.getElementById("pause-overlay").style.display = 'none';
+    document.exitPointerLock();
+    if (multiplayer.enabled) {
+        multiplayer.enabled = false;
+        if (multiplayer.ws) { try { multiplayer.ws.close(); } catch (e) {} multiplayer.ws = null; }
+    }
+    const spawn = findOpenSpawnCell(3, 3);
+    playerX = spawn.x; playerY = spawn.y; playerAngle = 0.0; playerPitch = 0.0; playerZ = 0; playerVelZ = 0; isOnGround = true;
+    health = 100; maxHealth = 100; damageMultiplier = 1.0; score = 0; ammo = 100;
+    maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; maxPistolClip = 12; maxSniperClip = 5; maxFlamethrowerFuel = 100;
+    shotgunClip = 2; rifleClip = 30; minigunClip = 100; pistolClip = 12; sniperClip = 5; flamethrowerFuel = 100;
+    currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadingWeapon = null; reloadTimer = 0; meleeCooldownTimer = 0; pistolFireRateTimer = 0; flamethrowerTickTimer = 0; hardBossKillCount = 0;
+    weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
+    gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
+    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
+    meleeTier = 0; chainsawCharge = maxChainsawCharge; isChainsawActive = false; chainsawTickTimer = 0;
+    grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
+    tracers.forEach(t => { if (scene) scene.remove(t.mesh); }); tracers = [];
+    enemies = []; projectiles = []; particles = []; pickups = [];
+    WaveManager.reset();
+    bossUi.style.display = "none"; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
+    healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)"; reloadUi.innerText = "";
+    updateGrenadeUi(); updateWeaponVisibility(); updateDifficultyUi();
+    gameState = 'START'; document.getElementById("start-overlay").style.display = 'flex';
 }
 
 function updateShopUI() {
@@ -2116,6 +2167,7 @@ WaveManager.startNextWave();
 const keys = {};
 window.addEventListener('keydown', e => {
     if (e.code === 'KeyE') { toggleShop(); return; }
+    if (e.code === 'Escape') { togglePause(); return; }
     if (e.code === 'KeyF') { toggleFullscreen(); return; }
     if (gameState !== 'PLAYING') return;
     keys[e.code] = true;
