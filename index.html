@@ -62,6 +62,12 @@
             background: rgba(0, 0, 0, 0.55); overflow: hidden;
         }
         #stamina-bar-fill {
+            display: block; /* ИСПРАВЛЕНИЕ БАГА: это <span>, а у inline-элементов CSS-свойство
+            width полностью ИГНОРИРУЕТСЯ браузером (спецификация CSS), независимо от того,
+            что установлено через JS (staminaBarFillUi.style.width). Из-за этого полоска
+            стамины визуально всегда выглядела пустой, хотя updateStaminaUi() и логика
+            расхода/восстановления stamina работали правильно и корректно считали процент.
+            display: block заставляет width применяться по факту. */
             height: 100%; width: 100%;
             background: linear-gradient(90deg, #ffd23a, #ff9f1c);
             transition: width 0.08s linear, background-color 0.15s linear;
