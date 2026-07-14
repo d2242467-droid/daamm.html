@@ -791,38 +791,6 @@ const DIFFICULTY_SETTINGS = {
 };
 let difficulty = 'EASY';
 
-// ==========================================================================
-// ДИНАМИЧЕСКОЕ МАСШТАБИРОВАНИЕ УРОНА ПО СЛОЖНОСТИ
-// ==========================================================================
-// Отдельные от DIFFICULTY_SETTINGS (характеристики врагов) настройки урона
-// ИГРОКА для каждого уровня сложности. Снайперка и Гаусс-винтовка намеренно
-// исключены (их баланс уже выстроен вокруг заряда/пробития/дальности и не
-// должен зависеть от сложности) — см. calculateDamage() ниже.
-const DIFFICULTY_DAMAGE_SETTINGS = {
-    EASY:   { damageBonus: 0.15 }, // +15% к базовому урону
-    MEDIUM: { damageBonus: 0.25 }, // +25% к базовому урону
-    HARD:   { damageBonus: 0.30 }  // +30% к базовому урону
-};
-
-// Оружие, для которого бонус урона по сложности НИКОГДА не применяется —
-// они всегда используют чистый базовый урон (с учётом только damageMultiplier
-// из магазина), независимо от выбранной сложности.
-const DIFFICULTY_DAMAGE_EXEMPT_WEAPONS = ['sniper', 'gauss'];
-
-// ЕДИНАЯ ТОЧКА РАСЧЁТА УРОНА ОРУЖИЯ.
-// baseDamage  — базовый урон оружия (константа BASE_..._DAMAGE и т.п.)
-// weaponType  — ключ оружия ('shotgun', 'rifle', 'sniper', 'gauss', ...); по
-//               умолчанию берётся текущее оружие игрока (currentWeapon).
-// Всегда применяет апгрейд-множитель игрока (damageMultiplier, покупается в
-// магазине). Дополнительно, если оружие НЕ 'sniper' (Снайперская винтовка) и
-// НЕ 'gauss' (Гаусс-винтовка), добавляет процентный бонус текущей сложности
-// поверх базового урона.
-function calculateDamage(baseDamage, weaponType = currentWeapon) {
-    const isExempt = DIFFICULTY_DAMAGE_EXEMPT_WEAPONS.includes(weaponType);
-    const difficultyBonus = isExempt ? 0 : (DIFFICULTY_DAMAGE_SETTINGS[difficulty]?.damageBonus || 0);
-    return baseDamage * (1 + difficultyBonus) * damageMultiplier;
-}
-
 const multiplayer = { enabled: false, ws: null, myId: null, players: {}, inputSendTimer: 0 };
 let weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
 let shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
@@ -1066,7 +1034,57 @@ function makeProceduralNoiseTexture(colorBase, countX=16, countY=16) {
     return texture;
 }
 
+// ТЕКСТУРА БОССА-ВОРДЕНА (пиксель-арт 64x64): тёмный сланцево-синий/чёрный фон,
+// биолюминесцентные голубые пятна (гуще у "рогов" сверху и в области груди),
+// костяно-белые полосы рёбер в грудной зоне. Используется на ЛЁГКОЙ и СРЕДНЕЙ сложности.
+function makeWardenTexture() {
+    const size = 64; const grid = 32; const cell = size / grid;
+    const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    for (let gx = 0; gx < grid; gx++) {
+        for (let gy = 0; gy < grid; gy++) {
+            let r, g, b;
+            if (Math.random() < 0.6) { r = 10 + Math.random() * 10; g = 14 + Math.random() * 10; b = 24 + Math.random() * 16; }
+            else { r = 3; g = 5; b = 9; }
+            const inChest = gy > grid * 0.35 && gy < grid * 0.68 && gx > grid * 0.28 && gx < grid * 0.72;
+            const inHorns = gy < grid * 0.16 && (gx < grid * 0.32 || gx > grid * 0.68);
+            if ((inChest || inHorns) && Math.random() < 0.22) { r = 0; g = 200 + Math.random() * 55; b = 220 + Math.random() * 35; }
+            if (inChest && (gy % 4 === 0) && Math.random() < 0.5) { r = 210 + Math.random() * 30; g = 205 + Math.random() * 30; b = 190 + Math.random() * 25; }
+            ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+            ctx.fillRect(gx * cell, gy * cell, cell, cell);
+        }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestFilter;
+    return texture;
+}
+
+// ТЕКСТУРА ФАНТОМА (пиксель-арт 64x64): тёмно-синий/серый кожистый узор с редкими
+// более тёмными "трещинами" для эффекта потрёпанных крыльев. Используется для
+// обычных летающих врагов (type === 'flyer').
+function makePhantomTexture() {
+    const size = 64; const grid = 32; const cell = size / grid;
+    const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    for (let gx = 0; gx < grid; gx++) {
+        for (let gy = 0; gy < grid; gy++) {
+            let r, g, b; const n = Math.random();
+            if (n < 0.5) { r = 35 + Math.random() * 15; g = 42 + Math.random() * 15; b = 52 + Math.random() * 18; }
+            else if (n < 0.8) { r = 20 + Math.random() * 10; g = 25 + Math.random() * 10; b = 32 + Math.random() * 12; }
+            else { r = 55; g = 62; b = 72; }
+            if (Math.random() < 0.06) { r *= 0.3; g *= 0.3; b *= 0.3; }
+            ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+            ctx.fillRect(gx * cell, gy * cell, cell, cell);
+        }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestFilter;
+    return texture;
+}
+
 function initTextures() {
+    textures.warden = makeWardenTexture();
+    textures.phantom = makePhantomTexture();
     textures[1] = makeProceduralNoiseTexture({ r: 90, g: 90, b: 90 }, 8, 8);
     textures[2] = makeProceduralNoiseTexture({ r: 93, g: 64, b: 55 }, 4, 16);
     textures[3] = makeProceduralNoiseTexture({ r: 46, g: 125, b: 50 }, 8, 8);
@@ -1265,19 +1283,16 @@ function rebuild3DMap() {
                 // наземные юниты не могут пройти сквозь неё, кроме как перепрыгнув (см. коллизии движения)
                 const water = new THREE.Mesh(waterGeometry, waterMat);
                 water.position.set(x + 0.5, 0.05, z + 0.5);
-                water.userData.type = 'Water'; // МЕТКА ДЛЯ ФИЛЬТРА RAYCASTER'ОВ: пули/лучи должны проходить сквозь воду
                 mapBlocksGroup.add(water);
             } else if (cellVal === BUSH_TILE) {
                 // КУСТ: проходимое укрытие - несколько низкополигональных "кочек" листвы,
                 // не блокирует движение, но скрывает игрока от врагов (см. isPlayerHidden)
                 const bushGroup = new THREE.Group();
-                bushGroup.userData.type = 'Bush'; // МЕТКА ДЛЯ ФИЛЬТРА RAYCASTER'ОВ: пули/лучи должны проходить сквозь кусты
                 const bushMat = new THREE.MeshLambertMaterial({ map: textures[BUSH_TILE], transparent: true, opacity: 0.92 });
                 const puffPositions = [[0, 0, 0, 0.34], [-0.22, 0.05, -0.18, 0.24], [0.24, 0.02, -0.15, 0.22], [-0.18, 0.03, 0.22, 0.22], [0.2, 0.06, 0.2, 0.24]];
                 puffPositions.forEach(pp => {
                     const puff = new THREE.Mesh(new THREE.SphereGeometry(pp[3], 6, 5), bushMat);
                     puff.position.set(x + 0.5 + pp[0], 0.28 + pp[1], z + 0.5 + pp[2]);
-                    puff.userData.type = 'Bush'; // тоже метим дочерние меши - intersectObjects может вернуть их напрямую
                     bushGroup.add(puff);
                 });
                 mapBlocksGroup.add(bushGroup);
@@ -1517,14 +1532,33 @@ function buildEnemyMesh(type, isFlyingBoss) {
             eyeL.material.color.setRGB(0.8, 0.4 * pulse, 1); eyeR.material.color.copy(eyeL.material.color);
         };
     } else if (type === 'boss') {
-        const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.8, 0.8), new THREE.MeshLambertMaterial({ color: 0x12131c }));
+        // НАЗЕМНЫЙ БОСС (ЛЕГКО/СРЕДНЕ), ВОРДЕН-СТИЛЬ: тёмный сланцево-синий/чёрный
+        // пиксель-арт корпус (textures.warden), биолюминесцентные голубые рога и
+        // грудная полость, костяно-белые полосы рёбер поверх груди.
+        const wardenMat = new THREE.MeshLambertMaterial({ map: textures.warden, color: 0xffffff });
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.8, 0.8), wardenMat);
         torso.position.y = 0.9; group.add(torso);
-        const innerCore = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.9), new THREE.MeshLambertMaterial({ color: 0x00fff2, emissive: 0x0088cc }));
+        const innerCore = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.9), new THREE.MeshLambertMaterial({ color: 0x00fff2, emissive: 0x0088cc, emissiveIntensity: 1.1 }));
         innerCore.position.set(0, 1.0, 0.05); group.add(innerCore);
-        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.2, 0.3), new THREE.MeshLambertMaterial({ color: 0x0a0b12 }));
+        // РЁБРА: костяно-белые полосы поверх грудной полости
+        const ribGeom = new THREE.BoxGeometry(1.0, 0.06, 0.85);
+        const ribMat = new THREE.MeshLambertMaterial({ color: 0xe8e2d0 });
+        const rib1 = new THREE.Mesh(ribGeom, ribMat); rib1.position.set(0, 1.28, 0.02); group.add(rib1);
+        const rib2 = new THREE.Mesh(ribGeom, ribMat); rib2.position.set(0, 1.12, 0.02); group.add(rib2);
+        const rib3 = new THREE.Mesh(ribGeom, ribMat); rib3.position.set(0, 0.96, 0.02); group.add(rib3);
+        // РОГА: голубые светящиеся шипы на голове, пульсирующие в такт с ядром
+        const hornGeom = new THREE.ConeGeometry(0.09, 0.4, 5);
+        const hornMat = new THREE.MeshLambertMaterial({ color: 0x0a2530, emissive: 0x00e5ff, emissiveIntensity: 0.8 });
+        const hornL = new THREE.Mesh(hornGeom, hornMat); hornL.position.set(-0.28, 1.95, 0); hornL.rotation.z = 0.35; group.add(hornL);
+        const hornR = new THREE.Mesh(hornGeom, hornMat); hornR.position.set(0.28, 1.95, 0); hornR.rotation.z = -0.35; group.add(hornR);
+        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.2, 0.3), wardenMat);
         leftArm.position.set(-0.75, 0.8, 0); group.add(leftArm);
         const rightArm = leftArm.clone(); rightArm.position.x = 0.75; group.add(rightArm);
-        animator = (time) => { leftArm.rotation.x = Math.sin(time * 8) * 0.3; rightArm.rotation.x = -Math.sin(time * 8) * 0.3; innerCore.rotation.y = time * 2; };
+        animator = (time) => {
+            leftArm.rotation.x = Math.sin(time * 8) * 0.3; rightArm.rotation.x = -Math.sin(time * 8) * 0.3;
+            innerCore.rotation.y = time * 2;
+            hornMat.emissiveIntensity = 0.7 + Math.sin(time * 3) * 0.3;
+        };
     } else if (type === 'creeper') {
         const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), new THREE.MeshLambertMaterial({ color: 0x1b8a1b }));
         head.position.y = 0.7; group.add(head);
@@ -1551,11 +1585,32 @@ function buildEnemyMesh(type, isFlyingBoss) {
         blaster.position.set(0.16, 0.4, 0.1); group.add(blaster);
         animator = (time) => { blaster.position.y = 0.4 + Math.sin(time * 6) * 0.02; };
     } else if (type === 'flyer') {
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.35), new THREE.MeshLambertMaterial({ color: 0x5c6e62 }));
+        // ФАНТОМ-СТИЛЬ: тёмно-синие/серые рваные кожистые крылья (textures.phantom),
+        // светящиеся зелёные глаза, полупрозрачное "призрачное" тело.
+        const wingMat = new THREE.MeshLambertMaterial({ map: textures.phantom, color: 0xffffff, transparent: true, opacity: 0.88 });
+        const bodyMat = new THREE.MeshLambertMaterial({ map: textures.phantom, color: 0xcfd8e0, transparent: true, opacity: 0.9 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.38), bodyMat);
         body.position.y = 0.5; group.add(body);
-        const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.2), new THREE.MeshLambertMaterial({ color: 0x4a5850 }));
-        wingL.position.set(-0.3, 0.5, 0); group.add(wingL); const wingR = wingL.clone(); wingR.position.x = 0.3; group.add(wingR);
-        animator = (time) => { const wingFlap = Math.sin(time * 12) * 0.6; wingL.rotation.z = wingFlap; wingR.rotation.z = -wingFlap; };
+        const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.02), new THREE.MeshBasicMaterial({ color: 0x33ff55 }));
+        eyeL.position.set(-0.06, 0.53, 0.19); group.add(eyeL); const eyeR = eyeL.clone(); eyeR.position.x = 0.06; group.add(eyeR);
+        const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.22), wingMat);
+        wingL.position.set(-0.32, 0.5, 0); group.add(wingL);
+        // РВАНЫЕ КРАЯ КРЫЛЬЕВ: мелкие смещённые сегменты для эффекта потрёпанности
+        const tatterL1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.1), wingMat);
+        tatterL1.position.set(-0.52, 0.47, 0.08); tatterL1.rotation.y = 0.3; group.add(tatterL1);
+        const tatterL2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 0.08), wingMat);
+        tatterL2.position.set(-0.5, 0.47, -0.09); tatterL2.rotation.y = -0.25; group.add(tatterL2);
+        const wingR = wingL.clone(); wingR.position.x = 0.32; group.add(wingR);
+        const tatterR1 = tatterL1.clone(); tatterR1.position.x = 0.52; group.add(tatterR1);
+        const tatterR2 = tatterL2.clone(); tatterR2.position.x = 0.5; group.add(tatterR2);
+        animator = (time) => {
+            const wingFlap = Math.sin(time * 12) * 0.6;
+            wingL.rotation.z = wingFlap; wingR.rotation.z = -wingFlap;
+            tatterL1.rotation.z = wingFlap; tatterL2.rotation.z = wingFlap;
+            tatterR1.rotation.z = -wingFlap; tatterR2.rotation.z = -wingFlap;
+            const eyePulse = 0.5 + Math.sin(time * 6) * 0.5;
+            eyeL.material.color.setRGB(0.2, 0.6 + eyePulse * 0.4, 0.3); eyeR.material.color.copy(eyeL.material.color);
+        };
     }
     // ПОЛОСКА ЗДОРОВЬЯ: НЕ добавляется как child этой group. group.rotation.y крутится каждый
     // кадр лицом к игроку (см. syncEntitiesWith3DScene) — если бар был бы её ребёнком, его
@@ -2301,28 +2356,28 @@ function executeShot(dt) {
         if (!(isReloading && reloadingWeapon === 'shotgun') && shotgunClip > 0 && !isShooting && ammo > 0) {
             isShooting = true; shootTimer = 0; shotgunClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`;
-            playShotgunSound(); triggerMuzzleFlash(); checkHit(0.18, calculateDamage(BASE_SHOTGUN_DAMAGE, 'shotgun'));
+            playShotgunSound(); triggerMuzzleFlash(); checkHit(0.18, BASE_SHOTGUN_DAMAGE * damageMultiplier);
             if (shotgunClip <= 0 && ammo > 0 && !isReloading) startShotgunReload();
         }
     } else if (currentWeapon === 'rifle') {
         if (!(isReloading && reloadingWeapon === 'rifle') && rifleClip > 0 && ammo > 0 && rifleFireRateTimer <= 0) {
             isShooting = true; shootTimer = 0; rifleClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/${maxRifleClip})`;
-            rifleFireRateTimer = 0.12; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.06, calculateDamage(BASE_RIFLE_DAMAGE, 'rifle'));
+            rifleFireRateTimer = 0.12; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.06, BASE_RIFLE_DAMAGE * damageMultiplier);
             if (rifleClip <= 0 && ammo > 0 && !isReloading) startRifleReload();
         }
     } else if (currentWeapon === 'minigun') {
         if (!(isReloading && reloadingWeapon === 'minigun') && minigunClip > 0 && ammo > 0 && minigunFireRateTimer <= 0) {
             isShooting = true; shootTimer = 0; minigunClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`;
-            minigunFireRateTimer = 0.05; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.07, calculateDamage(BASE_MINIGUN_DAMAGE, 'minigun'));
+            minigunFireRateTimer = 0.05; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.07, BASE_MINIGUN_DAMAGE * damageMultiplier);
             if (minigunClip <= 0 && ammo > 0 && !isReloading) startMinigunReload();
         }
     } else if (currentWeapon === 'rocket') {
         if (rocketLoaded) {
             isShooting = true; shootTimer = 0; rocketLoaded = false; rocketReloadTimer = rocketReloadDuration;
             reloadUi.innerText = "(ЗАРЯЖАЕТСЯ...)"; playRocketLaunchSound(); triggerMuzzleFlash();
-            projectiles.push({ x: playerX + Math.cos(playerAngle) * 0.5, y: playerY + Math.sin(playerAngle) * 0.5, z: playerZ + 0.5, vx: Math.cos(playerAngle) * 12.0, vy: Math.sin(playerAngle) * 12.0, vz: playerPitch * 8.0, damage: calculateDamage(BASE_ROCKET_DAMAGE, 'rocket') });
+            projectiles.push({ x: playerX + Math.cos(playerAngle) * 0.5, y: playerY + Math.sin(playerAngle) * 0.5, z: playerZ + 0.5, vx: Math.cos(playerAngle) * 12.0, vy: Math.sin(playerAngle) * 12.0, vz: playerPitch * 8.0, damage: BASE_ROCKET_DAMAGE * damageMultiplier });
             if (currentWeapon === 'rocket') weaponUi.innerText = `РАКЕТНИЦА [3] (ПЕРЕЗАРЯДКА)`;
         }
     } else if (currentWeapon === 'melee' && meleeTier === 2) {
@@ -2331,7 +2386,7 @@ function executeShot(dt) {
         if (chainsawCharge > 0) {
             isChainsawActive = true; isShooting = true; shootTimer += dt * 16;
             chainsawCharge = Math.max(0, chainsawCharge - CHAINSAW_DRAIN_PER_SECOND * dt);
-            applyConeDamage(CHAINSAW_RANGE, CHAINSAW_CONE, calculateDamage(CHAINSAW_DPS, 'melee'), dt);
+            applyConeDamage(CHAINSAW_RANGE, CHAINSAW_CONE, CHAINSAW_DPS * damageMultiplier, dt);
             chainsawTickTimer -= dt;
             if (chainsawTickTimer <= 0) { chainsawTickTimer = 0.1; playShotgunSound(); }
             weaponUi.innerText = `БЕНЗОПИЛА [M] (ЗАРЯД: ${Math.ceil(chainsawCharge)}%)`;
@@ -2343,7 +2398,7 @@ function executeShot(dt) {
         // КУЛАК / НОЖ: обычный удар с перезарядкой между атаками
         if (meleeCooldownTimer <= 0) {
             isShooting = true; shootTimer = 0; meleeCooldownTimer = MELEE_COOLDOWN;
-            const dmg = calculateDamage(meleeTier === 1 ? BASE_MELEE_DAMAGE : FIST_DAMAGE, 'melee');
+            const dmg = (meleeTier === 1 ? BASE_MELEE_DAMAGE : FIST_DAMAGE) * damageMultiplier;
             playShotgunSound(); checkHit(0.35, dmg, MELEE_RANGE, false);
         }
     } else if (currentWeapon === 'pistol') {
@@ -2351,7 +2406,7 @@ function executeShot(dt) {
         if (!(isReloading && reloadingWeapon === 'pistol') && pistolClip > 0 && ammo > 0 && pistolFireRateTimer <= 0) {
             isShooting = true; shootTimer = 0; pistolClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `ПИСТОЛЕТ [5] (${pistolClip}/${maxPistolClip})`;
-            pistolFireRateTimer = 0.28; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.05, calculateDamage(BASE_PISTOL_DAMAGE, 'pistol'));
+            pistolFireRateTimer = 0.28; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.05, BASE_PISTOL_DAMAGE * damageMultiplier);
             if (pistolClip <= 0 && ammo > 0 && !isReloading) startPistolReload();
         }
     } else if (currentWeapon === 'sniper') {
@@ -2359,7 +2414,7 @@ function executeShot(dt) {
         if (!(isReloading && reloadingWeapon === 'sniper') && sniperClip > 0 && !isShooting && ammo > 0) {
             isShooting = true; shootTimer = 0; sniperClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `СНАЙПЕРКА [6] (${sniperClip}/${maxSniperClip})`;
-            playRocketLaunchSound(); triggerMuzzleFlash(); checkHit(0.015, calculateDamage(BASE_SNIPER_DAMAGE, 'sniper'), 40);
+            playRocketLaunchSound(); triggerMuzzleFlash(); checkHit(0.015, BASE_SNIPER_DAMAGE * damageMultiplier, 40);
             if (sniperClip <= 0 && ammo > 0 && !isReloading) startSniperReload();
         }
     } else if (currentWeapon === 'flamethrower') {
@@ -2367,7 +2422,7 @@ function executeShot(dt) {
         if (!(isReloading && reloadingWeapon === 'flamethrower') && flamethrowerFuel > 0) {
             isShooting = true; shootTimer = 0;
             flamethrowerFuel = Math.max(0, flamethrowerFuel - 22 * dt);
-            applyConeDamage(FLAMETHROWER_RANGE, FLAMETHROWER_CONE, calculateDamage(FLAMETHROWER_DPS, 'flamethrower'), dt);
+            applyConeDamage(FLAMETHROWER_RANGE, FLAMETHROWER_CONE, FLAMETHROWER_DPS * damageMultiplier, dt);
             flamethrowerTickTimer -= dt;
             if (flamethrowerTickTimer <= 0) { flamethrowerTickTimer = 0.05; playPlasmaSound(); spawnFlameParticles(); triggerMuzzleFlash(); }
             weaponUi.innerText = `ОГНЕМЁТ [7] (${Math.ceil(flamethrowerFuel)}/${maxFlamethrowerFuel})`;
@@ -2445,23 +2500,6 @@ function releaseGaussCharge() {
 const gaussRaycaster = new THREE.Raycaster();
 const GAUSS_MAX_RANGE = 60;
 
-// ФИЛЬТР ДЛЯ RAYCASTER'ОВ: пули/лучи/линия видимости должны игнорировать
-// кусты и воду - они не являются "твёрдыми" препятствиями, в отличие от стен.
-// wallMeshes и так не содержит эти объекты (см. rebuild3DMap), но фильтр
-// применяется явно как доп. защита на случай, если список кандидатов
-// когда-либо расширится декоративными объектами.
-function isSolidRaycastTarget(hit) {
-    let o = hit.object;
-    while (o) {
-        if (o.userData && (o.userData.type === 'Bush' || o.userData.type === 'Water')) return false;
-        o = o.parent;
-    }
-    return true;
-}
-function filterSolidHits(hits) {
-    return hits.filter(isSolidRaycastTarget);
-}
-
 // Возвращает список мешей врагов (корневые Group-объекты) для проверки лучом.
 // Каждый корневой mesh помечен userData.gaussEnemyId в syncEntitiesWith3DScene().
 function getEnemyMeshesForRaycast() {
@@ -2509,7 +2547,7 @@ function fireGaussChargedShot(chargePct) {
     // Сначала находим ближайшую стену на пути луча — она ограничивает дальность/точку взрыва
     let wallDist = GAUSS_MAX_RANGE;
     if (wallMeshes.length) {
-        const wallHits = filterSolidHits(gaussRaycaster.intersectObjects(wallMeshes, false));
+        const wallHits = gaussRaycaster.intersectObjects(wallMeshes, false);
         if (wallHits.length) wallDist = wallHits[0].distance;
     }
 
@@ -2532,7 +2570,7 @@ function fireGaussChargedShot(chargePct) {
         const firstDist = pierced.length ? Math.min(pierced[0].dist, wallDist) : wallDist;
         const impact = origin.clone().addScaledVector(dir, firstDist);
         spawnBlueExplosion(impact.x, impact.z, impact.y);
-        applyAoeDamage(impact.x, impact.z, GAUSS_ROCKET_RADIUS, calculateDamage(BASE_ROCKET_DAMAGE, 'gauss'), true);
+        applyAoeDamage(impact.x, impact.z, GAUSS_ROCKET_RADIUS, BASE_ROCKET_DAMAGE * damageMultiplier, true);
         spawnGaussBeam(origin, dir, firstDist);
         return;
     }
@@ -2542,9 +2580,9 @@ function fireGaussChargedShot(chargePct) {
         const target = enemies.find(e => e._meshId === enemyId);
         if (!target) continue;
         let dmg;
-        if (chargePct < 50) dmg = calculateDamage(GAUSS_TIER2_DAMAGE, 'gauss');
-        else if (chargePct < 70) dmg = calculateDamage(BASE_GAUSS_DAMAGE, 'gauss');
-        else dmg = calculateDamage(BASE_GAUSS_DAMAGE * GAUSS_TIER4_PIERCE_MULT, 'gauss');
+        if (chargePct < 50) dmg = GAUSS_TIER2_DAMAGE * damageMultiplier;
+        else if (chargePct < 70) dmg = BASE_GAUSS_DAMAGE * damageMultiplier;
+        else dmg = BASE_GAUSS_DAMAGE * GAUSS_TIER4_PIERCE_MULT * damageMultiplier;
         target.health -= dmg;
         spawnBlood(target.x, target.y, dmg / 4);
         if (target.type === 'boss') bossHpUi.innerText = Math.max(0, Math.floor(target.health));
@@ -2553,7 +2591,7 @@ function fireGaussChargedShot(chargePct) {
         // Дополнительный урон по площади вокруг КАЖДОЙ пробитой цели — луч не просто пронзает,
         // а "разряжается" в стороны у каждого попадания.
         if (chargePct < 50) {
-            applyAoeDamage(target.x, target.y, GAUSS_TIER2_SPLASH_RADIUS, calculateDamage(GAUSS_TIER2_SPLASH_DAMAGE, 'gauss'), false);
+            applyAoeDamage(target.x, target.y, GAUSS_TIER2_SPLASH_RADIUS, GAUSS_TIER2_SPLASH_DAMAGE * damageMultiplier, false);
         }
     }
 
@@ -2563,13 +2601,13 @@ function fireGaussChargedShot(chargePct) {
         // ===================== 50%–70%: ЛУЧ + ВЗРЫВ В ТОЧКЕ ПОПАДАНИЯ =====================
         const impact = origin.clone().addScaledVector(dir, wallDist);
         spawnBlueExplosion(impact.x, impact.z, impact.y);
-        applyAoeDamage(impact.x, impact.z, GAUSS_TIER3_EXPLOSION_RADIUS, calculateDamage(GAUSS_TIER3_EXPLOSION_DAMAGE, 'gauss'), true);
+        applyAoeDamage(impact.x, impact.z, GAUSS_TIER3_EXPLOSION_RADIUS, GAUSS_TIER3_EXPLOSION_DAMAGE * damageMultiplier, true);
     } else if (chargePct >= 70) {
         // ===================== 70%–100%: ЛУЧ + ТРИ ВЗРЫВА ВДОЛЬ ВСЕГО ПУТИ =====================
         for (const frac of [0.25, 0.5, 0.75]) {
             const p = origin.clone().addScaledVector(dir, wallDist * frac);
             spawnBlueExplosion(p.x, p.z, p.y);
-            applyAoeDamage(p.x, p.z, GAUSS_TIER4_EXPLOSION_RADIUS, calculateDamage(GAUSS_TIER4_EXPLOSION_DAMAGE, 'gauss'), true);
+            applyAoeDamage(p.x, p.z, GAUSS_TIER4_EXPLOSION_RADIUS, GAUSS_TIER4_EXPLOSION_DAMAGE * damageMultiplier, true);
         }
     }
 }
@@ -2710,11 +2748,7 @@ function checkHit(fovSpread, damage, maxRange, useTracer) {
         for (let i = 0; i < steps; i++) {
             cx += stepX; cy += stepY; const cellX = Math.floor(cx); const cellY = Math.floor(cy);
             if (cellX < 0 || cellX >= mapSize || cellY < 0 || cellY >= mapSize) return false;
-            const cellVal = map[cellY * mapSize + cellX];
-            // БАГФИКС: КУСТЫ (BUSH_TILE) и ВОДА (WATER_TILE) - не твёрдые препятствия,
-            // выстрел должен проходить сквозь них и попадать во врага, стоящего за ними.
-            // Блокируют линию видимости только настоящие стены (любое другое значение > 0).
-            if (cellVal > 0 && cellVal !== BUSH_TILE && cellVal !== WATER_TILE) {
+            if (map[cellY * mapSize + cellX] > 0) {
                 if (Math.hypot(cx - playerX, cy - playerY) + 0.2 < dist) return false;
             }
         }
@@ -2805,7 +2839,7 @@ function isWallBetween(x1, y1, x2, y2) {
     stealthRaycaster.set(from, offset.normalize());
     stealthRaycaster.near = 0;
     stealthRaycaster.far = dist;
-    return filterSolidHits(stealthRaycaster.intersectObjects(wallMeshes, false)).length > 0;
+    return stealthRaycaster.intersectObjects(wallMeshes, false).length > 0;
 }
 
 // Скрыт ли игрок от КОНКРЕТНОГО врага прямо сейчас: должен стоять в кусте
