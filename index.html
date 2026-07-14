@@ -237,6 +237,32 @@
             background: radial-gradient(circle, rgba(120,0,0,0) 35%, rgba(160,0,0,0.85) 100%);
             pointer-events: none; z-index: 45; transition: none;
         }
+        /* ГАУСС-ВИНТОВКА: полоска заряда сбоку экрана (0%-100% за 8 сек удержания ЛКМ) */
+        #gauss-charge-container {
+            position: fixed; right: 34px; top: 50%; transform: translateY(-50%);
+            width: 28px; height: 240px; border: 2px solid #00BFFF; border-radius: 5px;
+            background: rgba(0, 10, 20, 0.55); overflow: hidden; opacity: 0;
+            pointer-events: none; transition: opacity 0.12s linear; z-index: 40;
+            box-shadow: 0 0 14px rgba(0, 191, 255, 0.5);
+        }
+        #gauss-charge-fill {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
+            background: linear-gradient(to top, #0000FF, #00BFFF, #baffff);
+            box-shadow: 0 0 12px #00BFFF; transition: height 0.05s linear;
+        }
+        /* Засечки на 30% / 50% / 70% — границы уровней заряда */
+        #gauss-charge-container::before, #gauss-charge-container::after, #gauss-charge-mark-70 {
+            content: ""; position: absolute; left: 0; width: 100%; height: 2px; background: rgba(255,255,255,0.65); z-index: 2;
+        }
+        #gauss-charge-container::before { bottom: 30%; }
+        #gauss-charge-container::after { bottom: 50%; }
+        #gauss-charge-mark-70 { bottom: 70%; }
+        #gauss-charge-label {
+            position: fixed; right: 30px; top: calc(50% + 128px); width: 36px;
+            color: #baffff; font-family: 'Courier New', monospace; font-size: 11px; font-weight: bold;
+            text-align: center; white-space: pre-line; line-height: 1.3; opacity: 0;
+            pointer-events: none; transition: opacity 0.12s linear; z-index: 40; text-shadow: 0 0 5px #000, 0 0 5px #000;
+        }
     </style>
 </head>
 <body>
@@ -245,6 +271,8 @@
     <div id="boss-ui">⚠ ВНИМАНИЕ: БОСС БЛИЗКО (HP: <span id="boss-hp">1000</span>/<span id="boss-hp-max">1000</span>) ⚠</div>
     <div id="flash-overlay"></div>
     <div id="damage-vignette"></div>
+    <div id="gauss-charge-container"><div id="gauss-charge-fill"></div><div id="gauss-charge-mark-70"></div></div>
+    <div id="gauss-charge-label"></div>
     
     <div id="game-container">
         <div id="crosshair"></div>
@@ -742,13 +770,21 @@ let minigunClip = 100;
 let pistolClip = 12;
 let sniperClip = 5;
 let flamethrowerFuel = 100;
+// СТАНДАРТНЫЙ РАЗМЕР БОЕПРИПАСОВ: столько патронов даёт обычный пикап боеприпасов
+// ЛЮБОМУ оружию (см. общий пул `ammo`, используемый дробовиком/автоматом/пулемётом/
+// пистолетом/снайперкой). Гаусс-винтовка ссылается на эту же константу ниже, чтобы её
+// бонус x3 всегда оставался кратным стандартной выдаче патронов, а не отдельным магическим числом.
+const STANDARD_AMMO_PICKUP_AMOUNT = 35;
 // ГАУСС-ВИНТОВКА: секретное оружие, НЕ продаётся в магазине — выпадает только с боссов.
 // Вместо обоймы использует "заряды" (gaussCharges), пополняемые дропом с боссов.
 let gaussCharges = 0;
-let gaussFireTimer = 0;
-const GAUSS_FIRE_DELAY = 0.5; // задержка между выстрелами (сек)
-const BASE_GAUSS_DAMAGE = 140; // урон каждой цели, пробиваемой лучом (не убывает с числом целей)
-const GAUSS_CHARGES_PER_DROP = 6; // сколько зарядов даёт один дроп с босса
+const BASE_GAUSS_DAMAGE = 140; // урон каждой цели, пробиваемой лучом на уровне заряда 50%-70% (не убывает с числом целей)
+// ВЫДАЧА ПРИ ДРОПЕ С БОССА: в 3 РАЗА больше стандартного количества патронов, которое
+// получает любое ДРУГОЕ оружие с обычного пикапа (STANDARD_AMMO_PICKUP_AMOUNT). Множитель
+// применяется ТОЛЬКО к Гаусс-винтовке — обычный пикап боеприпасов (см. пикап 'ammo' ниже)
+// по-прежнему выдаёт ровно STANDARD_AMMO_PICKUP_AMOUNT патронов, без изменений.
+const GAUSS_BOSS_DROP_MULTIPLIER = 3;
+const GAUSS_CHARGES_PER_DROP = STANDARD_AMMO_PICKUP_AMOUNT * GAUSS_BOSS_DROP_MULTIPLIER; // = 105
 let isShooting = false;
 let shootTimer = 0;
 let walkCycle = 0;
@@ -768,6 +804,7 @@ let isChainsawActive = false;
 let chainsawTickTimer = 0;
 let inventoryUiRefreshTimer = 0;
 let isReloading = false;
+let reloadingWeapon = null; // ЧТО именно перезаряжается — независимо от currentWeapon (см. пояснение ниже)
 let reloadTimer = 0;
 let reloadTotalDuration = 1; // используется, чтобы вычислить прогресс анимации смены модели при перезарядке
 
@@ -1308,19 +1345,23 @@ function create3DWeapons() {
 
 function updateWeaponVisibility() {
     if (!weaponMeshes.shotgun) return;
-    weaponMeshes.shotgun.visible = (currentWeapon === 'shotgun' && !isReloading);
-    weaponMeshes.rifle.visible = (currentWeapon === 'rifle' && !isReloading);
+    // ИСПРАВЛЕНИЕ БАГА: раньше "!isReloading" был глобальным условием — если ЛЮБОЕ оружие
+    // перезаряжалось в фоне (см. reloadingWeapon), а игрок уже держал ДРУГОЕ, его модель
+    // тоже пряталась. Теперь каждая модель прячется, только если перезаряжается ИМЕННО она.
+    const isCurrentReloading = isReloading && reloadingWeapon === currentWeapon;
+    weaponMeshes.shotgun.visible = (currentWeapon === 'shotgun' && !isCurrentReloading);
+    weaponMeshes.rifle.visible = (currentWeapon === 'rifle' && !isCurrentReloading);
     weaponMeshes.rocket.visible = (currentWeapon === 'rocket');
-    weaponMeshes.minigun.visible = (currentWeapon === 'minigun' && !isReloading);
+    weaponMeshes.minigun.visible = (currentWeapon === 'minigun' && !isCurrentReloading);
     weaponMeshes.fist.visible = (currentWeapon === 'melee' && meleeTier === 0);
     weaponMeshes.knife.visible = (currentWeapon === 'melee' && meleeTier === 1);
     weaponMeshes.chainsaw.visible = (currentWeapon === 'melee' && meleeTier === 2);
-    weaponMeshes.pistol.visible = (currentWeapon === 'pistol' && !isReloading);
-    weaponMeshes.sniper.visible = (currentWeapon === 'sniper' && !isReloading);
-    weaponMeshes.flamethrower.visible = (currentWeapon === 'flamethrower' && !isReloading);
+    weaponMeshes.pistol.visible = (currentWeapon === 'pistol' && !isCurrentReloading);
+    weaponMeshes.sniper.visible = (currentWeapon === 'sniper' && !isCurrentReloading);
+    weaponMeshes.flamethrower.visible = (currentWeapon === 'flamethrower' && !isCurrentReloading);
     weaponMeshes.gauss.visible = (currentWeapon === 'gauss');
     // ПЕРЕКЛЮЧЕНИЕ НА "МОДЕЛЬ ПЕРЕЗАРЯДКИ": во время перезарядки показываем вращающийся значок вместо оружия
-    weaponMeshes.reloadIcon.visible = isReloading && ['shotgun', 'rifle', 'minigun', 'pistol', 'sniper', 'flamethrower'].includes(currentWeapon);
+    weaponMeshes.reloadIcon.visible = isCurrentReloading;
     updateInventoryUI();
 }
 
@@ -1859,7 +1900,7 @@ function attemptMultiplayerConnect() {
             playerZ = 0; playerVelZ = 0; isOnGround = true; health = 100; maxHealth = 100; score = 0; ammo = 100;
             maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; shotgunClip = 2; rifleClip = 30; minigunClip = 100;
             currentWeapon = 'shotgun'; rocketLoaded = true; weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
-            gaussCharges = 0; gaussFireTimer = 0;
+            gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
             grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = []; meleeCooldownTimer = 0;
             enemies = []; projectiles = []; particles = []; pickups = [];
             healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)";
@@ -1904,7 +1945,7 @@ function updateDifficultyUi() {
 function restartGame() {
     if (multiplayer.enabled) {
         if (multiplayer.ws && multiplayer.ws.readyState === WebSocket.OPEN) multiplayer.ws.send(JSON.stringify({ type: 'respawn' }));
-        playerZ = 0; playerVelZ = 0; isOnGround = true; ammo = 100; shotgunClip = maxShotgunClip; rifleClip = maxRifleClip; minigunClip = maxMinigunClip; isReloading = false; reloadTimer = 0; meleeCooldownTimer = 0;
+        playerZ = 0; playerVelZ = 0; isOnGround = true; ammo = 100; shotgunClip = maxShotgunClip; rifleClip = maxRifleClip; minigunClip = maxMinigunClip; isReloading = false; reloadingWeapon = null; reloadTimer = 0; meleeCooldownTimer = 0;
         thrownGrenades = []; fireZones = [];
         projectiles = []; particles = []; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
         ammoUi.innerText = ammo; weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`; reloadUi.innerText = ""; gameState = 'PLAYING'; canvas.requestPointerLock();
@@ -1915,9 +1956,9 @@ function restartGame() {
     health = 100; maxHealth = 100; damageMultiplier = 1.0; score = 0; ammo = 100;
     maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; maxPistolClip = 12; maxSniperClip = 5; maxFlamethrowerFuel = 100;
     shotgunClip = 2; rifleClip = 30; minigunClip = 100; pistolClip = 12; sniperClip = 5; flamethrowerFuel = 100;
-    currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadTimer = 0; meleeCooldownTimer = 0; pistolFireRateTimer = 0; flamethrowerTickTimer = 0; hardBossKillCount = 0;
+    currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadingWeapon = null; reloadTimer = 0; meleeCooldownTimer = 0; pistolFireRateTimer = 0; flamethrowerTickTimer = 0; hardBossKillCount = 0;
     weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
-    gaussCharges = 0; gaussFireTimer = 0;
+    gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
     shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
     meleeTier = 0; chainsawCharge = maxChainsawCharge; isChainsawActive = false; chainsawTickTimer = 0;
     grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
@@ -1941,12 +1982,12 @@ window.addEventListener('keydown', e => {
     if (e.code === 'Digit1') { 
         currentWeapon = 'shotgun'; 
         weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`; 
-        reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; 
+        reloadUi.innerText = (isReloading && reloadingWeapon === 'shotgun') ? "(ПЕРЕЗАРЯДКА...)" : ""; 
         updateWeaponVisibility();
     }
     if (e.code === 'Digit2') { 
         if (weaponsUnlocked.rifle) {
-            currentWeapon = 'rifle'; weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/${maxRifleClip})`; reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
+            currentWeapon = 'rifle'; weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/${maxRifleClip})`; reloadUi.innerText = (isReloading && reloadingWeapon === 'rifle') ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
         } else { showCenterMessage("ЗАБЛОКИРОВАНО! Купите Автомат в магазине (E)"); }
     }
     if (e.code === 'Digit3') { 
@@ -1956,20 +1997,20 @@ window.addEventListener('keydown', e => {
     }
     if (e.code === 'Digit4') { 
         if (weaponsUnlocked.minigun) {
-            currentWeapon = 'minigun'; weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`; reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
+            currentWeapon = 'minigun'; weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`; reloadUi.innerText = (isReloading && reloadingWeapon === 'minigun') ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
         } else { showCenterMessage("ЗАБЛОКИРОВАНО! Купите Пулемет в магазине (E)"); }
     }
     if (e.code === 'Digit5') {
-        currentWeapon = 'pistol'; weaponUi.innerText = `ПИСТОЛЕТ [5] (${pistolClip}/${maxPistolClip})`; reloadUi.innerText = isReloading ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
+        currentWeapon = 'pistol'; weaponUi.innerText = `ПИСТОЛЕТ [5] (${pistolClip}/${maxPistolClip})`; reloadUi.innerText = (isReloading && reloadingWeapon === 'pistol') ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
     }
     if (e.code === 'Digit6') {
         if (weaponsUnlocked.sniper) {
-            currentWeapon = 'sniper'; weaponUi.innerText = `СНАЙПЕРКА [6] (${sniperClip}/${maxSniperClip})`; reloadUi.innerText = isReloading ? "(ДОЛГАЯ ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
+            currentWeapon = 'sniper'; weaponUi.innerText = `СНАЙПЕРКА [6] (${sniperClip}/${maxSniperClip})`; reloadUi.innerText = (isReloading && reloadingWeapon === 'sniper') ? "(ДОЛГАЯ ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
         } else { showCenterMessage("ЗАБЛОКИРОВАНО! Купите Снайперку в магазине (E)"); }
     }
     if (e.code === 'Digit7') {
         if (weaponsUnlocked.flamethrower) {
-            currentWeapon = 'flamethrower'; weaponUi.innerText = `ОГНЕМЁТ [7] (${Math.ceil(flamethrowerFuel)}/${maxFlamethrowerFuel})`; reloadUi.innerText = isReloading ? "(ЗАПРАВКА...)" : ""; updateWeaponVisibility();
+            currentWeapon = 'flamethrower'; weaponUi.innerText = `ОГНЕМЁТ [7] (${Math.ceil(flamethrowerFuel)}/${maxFlamethrowerFuel})`; reloadUi.innerText = (isReloading && reloadingWeapon === 'flamethrower') ? "(ЗАПРАВКА...)" : ""; updateWeaponVisibility();
         } else { showCenterMessage("ЗАБЛОКИРОВАНО! Купите Огнемёт в магазине (E)"); }
     }
     if (e.code === 'Digit8') {
@@ -2004,8 +2045,22 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => keys[e.code] = false);
 
 let isMouseDown = false; let isMouseLocked = false;
-canvas.addEventListener('mousedown', () => { if (gameState === 'PLAYING') { isMouseDown = true; executeShot(); } });
-window.addEventListener('mouseup', () => isMouseDown = false);
+canvas.addEventListener('mousedown', () => {
+    if (gameState !== 'PLAYING') return;
+    isMouseDown = true;
+    if (currentWeapon === 'gauss') {
+        // ГАУСС-ВИНТОВКА: ЛКМ теперь НЕ стреляет сразу — начинает зарядку (см. updateGaussCharging).
+        // Выстрел происходит при ОТПУСКАНИИ кнопки (releaseGaussCharge), см. mouseup ниже.
+        if (gaussCharges > 0) { gaussCharging = true; gaussChargePercent = 0; updateGaussChargeUi(); }
+        else { showCenterMessage("НЕТ ЗАРЯДОВ ГАУСС-ВИНТОВКИ! Найдите ещё у боссов."); }
+    } else {
+        executeShot();
+    }
+});
+window.addEventListener('mouseup', () => {
+    isMouseDown = false;
+    if (currentWeapon === 'gauss' && gaussCharging) releaseGaussCharge();
+});
 document.addEventListener('pointerlockchange', () => { isMouseLocked = (document.pointerLockElement === canvas); });
 canvas.addEventListener('mousemove', (e) => {
     if (isMouseLocked && gameState === 'PLAYING') {
@@ -2155,25 +2210,27 @@ function executeShot(dt) {
     if (health <= 0 || gameState !== 'PLAYING') return;
     if (currentWeapon === 'shotgun') {
         // УЛУЧШЕННЫЙ ДРОБОВИК: проверка магазина и увеличенный урон
-        if (!isReloading && shotgunClip > 0 && !isShooting && ammo > 0) {
+        // (isReloading проверяем ИМЕННО для этого оружия — другое оружие может спокойно
+        // перезаряжаться в фоне, пока держишь дробовик, см. reloadingWeapon)
+        if (!(isReloading && reloadingWeapon === 'shotgun') && shotgunClip > 0 && !isShooting && ammo > 0) {
             isShooting = true; shootTimer = 0; shotgunClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`;
             playShotgunSound(); triggerMuzzleFlash(); checkHit(0.18, BASE_SHOTGUN_DAMAGE * damageMultiplier);
-            if (shotgunClip <= 0 && ammo > 0) startShotgunReload();
+            if (shotgunClip <= 0 && ammo > 0 && !isReloading) startShotgunReload();
         }
     } else if (currentWeapon === 'rifle') {
-        if (!isReloading && rifleClip > 0 && ammo > 0 && rifleFireRateTimer <= 0) {
+        if (!(isReloading && reloadingWeapon === 'rifle') && rifleClip > 0 && ammo > 0 && rifleFireRateTimer <= 0) {
             isShooting = true; shootTimer = 0; rifleClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/${maxRifleClip})`;
             rifleFireRateTimer = 0.12; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.06, BASE_RIFLE_DAMAGE * damageMultiplier);
-            if (rifleClip <= 0 && ammo > 0) startRifleReload();
+            if (rifleClip <= 0 && ammo > 0 && !isReloading) startRifleReload();
         }
     } else if (currentWeapon === 'minigun') {
-        if (!isReloading && minigunClip > 0 && ammo > 0 && minigunFireRateTimer <= 0) {
+        if (!(isReloading && reloadingWeapon === 'minigun') && minigunClip > 0 && ammo > 0 && minigunFireRateTimer <= 0) {
             isShooting = true; shootTimer = 0; minigunClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`;
             minigunFireRateTimer = 0.05; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.07, BASE_MINIGUN_DAMAGE * damageMultiplier);
-            if (minigunClip <= 0 && ammo > 0) startMinigunReload();
+            if (minigunClip <= 0 && ammo > 0 && !isReloading) startMinigunReload();
         }
     } else if (currentWeapon === 'rocket') {
         if (rocketLoaded) {
@@ -2205,23 +2262,23 @@ function executeShot(dt) {
         }
     } else if (currentWeapon === 'pistol') {
         // ПИСТОЛЕТ: стартовое оружие, умеренный урон, быстрая перезарядка
-        if (!isReloading && pistolClip > 0 && ammo > 0 && pistolFireRateTimer <= 0) {
+        if (!(isReloading && reloadingWeapon === 'pistol') && pistolClip > 0 && ammo > 0 && pistolFireRateTimer <= 0) {
             isShooting = true; shootTimer = 0; pistolClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `ПИСТОЛЕТ [5] (${pistolClip}/${maxPistolClip})`;
             pistolFireRateTimer = 0.28; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.05, BASE_PISTOL_DAMAGE * damageMultiplier);
-            if (pistolClip <= 0 && ammo > 0) startPistolReload();
+            if (pistolClip <= 0 && ammo > 0 && !isReloading) startPistolReload();
         }
     } else if (currentWeapon === 'sniper') {
         // СНАЙПЕРСКАЯ ВИНТОВКА: огромный урон одним выстрелом, узкий разброс, долгая перезарядка
-        if (!isReloading && sniperClip > 0 && !isShooting && ammo > 0) {
+        if (!(isReloading && reloadingWeapon === 'sniper') && sniperClip > 0 && !isShooting && ammo > 0) {
             isShooting = true; shootTimer = 0; sniperClip--; ammo--;
             ammoUi.innerText = ammo; weaponUi.innerText = `СНАЙПЕРКА [6] (${sniperClip}/${maxSniperClip})`;
             playRocketLaunchSound(); triggerMuzzleFlash(); checkHit(0.015, BASE_SNIPER_DAMAGE * damageMultiplier, 40);
-            if (sniperClip <= 0 && ammo > 0) startSniperReload();
+            if (sniperClip <= 0 && ammo > 0 && !isReloading) startSniperReload();
         }
     } else if (currentWeapon === 'flamethrower') {
         // ОГНЕМЁТ: постоянный конусный урон по площади, пока зажата кнопка и есть топливо
-        if (!isReloading && flamethrowerFuel > 0) {
+        if (!(isReloading && reloadingWeapon === 'flamethrower') && flamethrowerFuel > 0) {
             isShooting = true; shootTimer = 0;
             flamethrowerFuel = Math.max(0, flamethrowerFuel - 22 * dt);
             applyConeDamage(FLAMETHROWER_RANGE, FLAMETHROWER_CONE, FLAMETHROWER_DPS * damageMultiplier, dt);
@@ -2230,25 +2287,75 @@ function executeShot(dt) {
             weaponUi.innerText = `ОГНЕМЁТ [7] (${Math.ceil(flamethrowerFuel)}/${maxFlamethrowerFuel})`;
             if (flamethrowerFuel <= 0) showCenterMessage("ТОПЛИВО ЗАКОНЧИЛОСЬ! Нажмите R");
         }
-    } else if (currentWeapon === 'gauss') {
-        // ГАУСС-ВИНТОВКА: пробивающий луч (см. fireGaussRifle) с фиксированной задержкой между выстрелами
-        if (gaussFireTimer <= 0) {
-            if (gaussCharges > 0) {
-                fireGaussRifle();
-            } else {
-                showCenterMessage("НЕТ ЗАРЯДОВ ГАУСС-ВИНТОВКИ! Найдите ещё у боссов.");
-            }
-        }
     }
+    // ГАУСС-ВИНТОВКА больше НЕ стреляет по одиночным кликам через executeShot() — теперь
+    // это оружие с зарядкой (см. ниже: gaussCharging / updateGaussCharging / releaseGaussCharge),
+    // управляемое напрямую из обработчиков mousedown/mouseup.
 }
 
 // ==========================================================================
-// ГАУСС-ВИНТОВКА — ПРОБИВАЮЩИЙ ЛУЧ (THREE.Raycaster.intersectObjects)
+// ГАУСС-ВИНТОВКА — ПОЛНЫЙ РЕВИЗИЯ МЕХАНИКИ: ЗАРЯДКА ПО ЛКМ (0-100% ЗА 8 СЕК)
 // ==========================================================================
-// В отличие от checkHit() (которая находит одну ближайшую цель по углу обзора),
-// Гаусс-винтовка стреляет НАСТОЯЩИМ 3D-лучом из камеры и пробивает ВСЕХ врагов
-// на своём пути через raycaster.intersectObjects(), нанося полный урон каждому.
-// Луч останавливается на ближайшей стене (если она есть перед пробиваемыми целями).
+// Удержание ЛКМ копит заряд от 0% до 100% за GAUSS_CHARGE_TIME секунд, что отражается
+// на полоске заряда сбоку экрана (#gauss-charge-container). Отпускание ЛКМ производит
+// выстрел, вид которого зависит от накопленного % заряда:
+//   0%–30%  — режим РАКЕТНИЦЫ: без пробивания, взрыв в точке первого попадания
+//   30%–50% — ПРОБИВАЮЩИЙ ЛУЧ с уроном снайперки +15%, с зоной поражения (AOE) вокруг
+//             каждой пробитой цели
+//   50%–70% — ПРОБИВАЮЩИЙ ЛУЧ + один взрыв в точке, где луч упирается в стену
+//   70%–100%— ПРОБИВАЮЩИЙ ЛУЧ + ТРИ взрыва, расставленные вдоль всего пути луча
+// Луч во ВСЕХ случаях синий (см. spawnGaussBeam) и наносит урон по площади через
+// applyAoeDamage(), а не только точечно.
+let gaussCharging = false;
+let gaussChargePercent = 0;
+const GAUSS_CHARGE_TIME = 8.0; // секунд до 100% заряда
+
+function gaussTierLabel(pct) {
+    if (pct < 30) return "РАКЕТА";
+    if (pct < 50) return "ЛУЧ +15%";
+    if (pct < 70) return "ЛУЧ + ВЗРЫВ";
+    return "МАКС: ЛУЧ x3 ВЗРЫВА";
+}
+
+function updateGaussChargeUi() {
+    const container = document.getElementById('gauss-charge-container');
+    const fill = document.getElementById('gauss-charge-fill');
+    const label = document.getElementById('gauss-charge-label');
+    if (!container || !fill || !label) return;
+    if (gaussCharging) {
+        container.style.opacity = '1'; label.style.opacity = '1';
+        fill.style.height = gaussChargePercent + '%';
+        label.innerText = `${Math.floor(gaussChargePercent)}%\n${gaussTierLabel(gaussChargePercent)}`;
+    } else {
+        container.style.opacity = '0'; label.style.opacity = '0';
+    }
+}
+
+// Вызывается КАЖДЫЙ КАДР, пока зажата ЛКМ и оружие в руках — гаусс-винтовка (см. update()).
+function updateGaussCharging(dt) {
+    if (health <= 0 || gameState !== 'PLAYING' || currentWeapon !== 'gauss') {
+        gaussCharging = false; gaussChargePercent = 0; updateGaussChargeUi(); return;
+    }
+    gaussChargePercent = Math.min(100, gaussChargePercent + (dt / GAUSS_CHARGE_TIME) * 100);
+    updateGaussChargeUi();
+}
+
+// Вызывается ОДИН РАЗ при отпускании ЛКМ — собственно выстрел.
+function releaseGaussCharge() {
+    if (!gaussCharging) return;
+    gaussCharging = false;
+    const chargePct = gaussChargePercent;
+    gaussChargePercent = 0;
+    updateGaussChargeUi();
+    if (gaussCharges <= 0 || health <= 0 || gameState !== 'PLAYING') return;
+    gaussCharges = Math.max(0, gaussCharges - 1);
+    weaponUi.innerText = `ГАУСС-ВИНТОВКА [8] (${gaussCharges} ЗАРЯДОВ)`;
+    fireGaussChargedShot(chargePct);
+}
+
+// ==========================================================================
+// РЕЙКАСТ-ИНФРАСТРУКТУРА (без изменений по сути — используется во всех уровнях заряда)
+// ==========================================================================
 const gaussRaycaster = new THREE.Raycaster();
 const GAUSS_MAX_RANGE = 60;
 
@@ -2274,12 +2381,20 @@ function resolveEnemyIdFromObject(obj) {
     return null;
 }
 
-function fireGaussRifle() {
+// Урон и радиусы взрывов по уровням заряда
+const GAUSS_TIER2_DAMAGE = BASE_SNIPER_DAMAGE * 1.15; // 30%-50%: урон снайперки +15%
+const GAUSS_TIER2_SPLASH_RADIUS = 1.6;
+const GAUSS_TIER2_SPLASH_DAMAGE = GAUSS_TIER2_DAMAGE * 0.4; // доп. урон по площади вокруг пробитых целей
+const GAUSS_ROCKET_RADIUS = 3.2; // 0%-30%: такой же радиус, как у ракетницы/гранаты
+const GAUSS_TIER3_EXPLOSION_RADIUS = 3.0;
+const GAUSS_TIER3_EXPLOSION_DAMAGE = BASE_FRAG_DAMAGE; // 50%-70%: один взрыв в точке попадания
+const GAUSS_TIER4_EXPLOSION_RADIUS = 2.6;
+const GAUSS_TIER4_EXPLOSION_DAMAGE = 110; // 70%-100%: три взрыва вдоль пути луча
+const GAUSS_TIER4_PIERCE_MULT = 1.25; // усиленный пробивающий урон на максимальном заряде
+
+function fireGaussChargedShot(chargePct) {
     if (!camera || !scene) return;
-    gaussFireTimer = GAUSS_FIRE_DELAY;
-    gaussCharges = Math.max(0, gaussCharges - 1);
     isShooting = true; shootTimer = 0;
-    weaponUi.innerText = `ГАУСС-ВИНТОВКА [8] (${gaussCharges} ЗАРЯДОВ)`;
     playRocketLaunchSound(); triggerMuzzleFlash();
 
     const origin = camera.position.clone();
@@ -2288,40 +2403,76 @@ function fireGaussRifle() {
     gaussRaycaster.set(origin, dir);
     gaussRaycaster.far = GAUSS_MAX_RANGE;
 
-    // Сначала находим ближайшую стену на пути луча — она ограничивает дальность пробития
+    // Сначала находим ближайшую стену на пути луча — она ограничивает дальность/точку взрыва
     let wallDist = GAUSS_MAX_RANGE;
     if (wallMeshes.length) {
         const wallHits = gaussRaycaster.intersectObjects(wallMeshes, false);
         if (wallHits.length) wallDist = wallHits[0].distance;
     }
 
-    // ПРОБИВАЮЩИЙ УРОН: raycaster.intersectObjects находит ВСЕ пересечения по пути луча,
-    // не только первое — так луч проходит "сквозь" каждого врага и наносит урон всем разом.
+    // Все враги, пересечённые лучом (отсортированы по дальности, без дублей по врагу)
     const enemyMeshes = getEnemyMeshesForRaycast();
-    const hits = enemyMeshes.length ? gaussRaycaster.intersectObjects(enemyMeshes, true) : [];
-
-    const alreadyHit = new Set();
-    let farthestHitDist = 0;
-    for (const hit of hits) {
+    const rawHits = enemyMeshes.length ? gaussRaycaster.intersectObjects(enemyMeshes, true) : [];
+    const seen = new Set();
+    const pierced = []; // [{ enemyId, dist }]
+    for (const hit of rawHits) {
         if (hit.distance > wallDist) continue; // стена блокирует всё, что дальше неё
         const enemyId = resolveEnemyIdFromObject(hit.object);
-        if (!enemyId || alreadyHit.has(enemyId)) continue;
-        alreadyHit.add(enemyId);
+        if (!enemyId || seen.has(enemyId)) continue;
+        seen.add(enemyId); pierced.push({ enemyId, dist: hit.distance });
+    }
+    pierced.sort((a, b) => a.dist - b.dist);
+
+    // ===================== 0%–30%: РЕЖИМ РАКЕТНИЦЫ =====================
+    // Без пробивания — луч ведёт себя как ракета: урон и взрыв ТОЛЬКО в точке первого контакта.
+    if (chargePct < 30) {
+        const firstDist = pierced.length ? Math.min(pierced[0].dist, wallDist) : wallDist;
+        const impact = origin.clone().addScaledVector(dir, firstDist);
+        spawnExplosion(impact.x, impact.z, impact.y);
+        applyAoeDamage(impact.x, impact.z, GAUSS_ROCKET_RADIUS, BASE_ROCKET_DAMAGE * damageMultiplier, true);
+        spawnGaussBeam(origin, dir, firstDist);
+        return;
+    }
+
+    // Для остальных уровней заряда луч ВСЕГДА пробивает всех врагов на пути и летит до стены
+    for (const { enemyId } of pierced) {
         const target = enemies.find(e => e._meshId === enemyId);
         if (!target) continue;
-        const dmg = BASE_GAUSS_DAMAGE * damageMultiplier;
+        let dmg;
+        if (chargePct < 50) dmg = GAUSS_TIER2_DAMAGE * damageMultiplier;
+        else if (chargePct < 70) dmg = BASE_GAUSS_DAMAGE * damageMultiplier;
+        else dmg = BASE_GAUSS_DAMAGE * GAUSS_TIER4_PIERCE_MULT * damageMultiplier;
         target.health -= dmg;
         spawnBlood(target.x, target.y, dmg / 4);
         if (target.type === 'boss') bossHpUi.innerText = Math.max(0, Math.floor(target.health));
         if (multiplayer.enabled && target.id) sendNetworkHit(target.id, dmg);
-        farthestHitDist = Math.max(farthestHitDist, hit.distance);
+        // ===================== 30%–50%: AOE-ЛУЧ (снайперский урон +15%) =====================
+        // Дополнительный урон по площади вокруг КАЖДОЙ пробитой цели — луч не просто пронзает,
+        // а "разряжается" в стороны у каждого попадания.
+        if (chargePct < 50) {
+            applyAoeDamage(target.x, target.y, GAUSS_TIER2_SPLASH_RADIUS, GAUSS_TIER2_SPLASH_DAMAGE * damageMultiplier, false);
+        }
     }
 
-    const beamLength = alreadyHit.size > 0 ? Math.min(wallDist, farthestHitDist + 1.0) : wallDist;
-    spawnGaussBeam(origin, dir, beamLength);
+    spawnGaussBeam(origin, dir, wallDist);
+
+    if (chargePct >= 50 && chargePct < 70) {
+        // ===================== 50%–70%: ЛУЧ + ВЗРЫВ В ТОЧКЕ ПОПАДАНИЯ =====================
+        const impact = origin.clone().addScaledVector(dir, wallDist);
+        spawnExplosion(impact.x, impact.z, impact.y);
+        applyAoeDamage(impact.x, impact.z, GAUSS_TIER3_EXPLOSION_RADIUS, GAUSS_TIER3_EXPLOSION_DAMAGE * damageMultiplier, true);
+    } else if (chargePct >= 70) {
+        // ===================== 70%–100%: ЛУЧ + ТРИ ВЗРЫВА ВДОЛЬ ВСЕГО ПУТИ =====================
+        for (const frac of [0.25, 0.5, 0.75]) {
+            const p = origin.clone().addScaledVector(dir, wallDist * frac);
+            spawnExplosion(p.x, p.z, p.y);
+            applyAoeDamage(p.x, p.z, GAUSS_TIER4_EXPLOSION_RADIUS, GAUSS_TIER4_EXPLOSION_DAMAGE * damageMultiplier, true);
+        }
+    }
 }
 
-// ВИЗУАЛ: голубой электрический луч (ломаная линия со случайным дрожанием "разрядов")
+// ВИЗУАЛ: голубой электрический луч (ломаная линия со случайным дрожанием "разрядов").
+// Используется ВСЕМИ уровнями заряда — синий цвет луча одинаков независимо от режима выстрела.
 function spawnGaussBeam(origin, dir, length) {
     if (!scene) return;
     const muzzlePoint = origin.clone().addScaledVector(dir, 0.35).add(new THREE.Vector3(0, -0.05, 0));
@@ -2342,16 +2493,17 @@ function spawnGaussBeam(origin, dir, length) {
         points.push(p);
     }
     const geo = new THREE.BufferGeometry().setFromPoints(points);
-    const mat = new THREE.LineBasicMaterial({ color: 0x22e5ff, transparent: true, opacity: 1.0 });
+    const mat = new THREE.LineBasicMaterial({ color: 0x0000FF, transparent: true, opacity: 1.0 });
     const line = new THREE.Line(geo, mat);
     scene.add(line);
-    // Второй, более толстый и тусклый слой для эффекта свечения луча
-    const glowMat = new THREE.LineBasicMaterial({ color: 0x99f5ff, transparent: true, opacity: 0.4 });
+    // Второй, более толстый и тусклый слой для эффекта свечения луча (ярко-синий/голубой)
+    const glowMat = new THREE.LineBasicMaterial({ color: 0x00BFFF, transparent: true, opacity: 0.45 });
     const glowLine = new THREE.Line(geo.clone(), glowMat);
     scene.add(glowLine);
     tracers.push({ mesh: line, life: GAUSS_BEAM_LIFETIME, extraMesh: glowLine });
 }
 const GAUSS_BEAM_LIFETIME = 0.16;
+
 
 // КОНУСНЫЙ УРОН (для Огнемёта): наносит урон всем врагам в радиусе и в пределах угла обзора конуса
 function applyConeDamage(range, halfAngle, dmgPerSecond, dt) {
@@ -2401,24 +2553,47 @@ function spawnTracer(hitDistance) {
     tracers.push({ mesh: line, life: TRACER_LIFETIME });
 }
 
+// ==========================================================================
+// ИСПРАВЛЕНИЕ БАГА ПЕРЕЗАРЯДКИ: раньше isReloading/reloadTimer были ОБЩИМИ на
+// все виды оружия, а по завершении таймера обойма пополнялась оружию, которое
+// СЕЙЧАС в руках (currentWeapon) — а не тому, которое реально перезаряжалось.
+// Если игрок переключался на другое оружие ПОКА шла перезарядка (клавишами
+// 1-8/M — ничего этому не мешало), таймер завершался, isReloading сбрасывался
+// в false, но патроны получало не то оружие: изначально опустевшее оружие
+// навсегда оставалось с пустой обоймой, а условие для выстрела/автоперезарядки
+// (`XClip > 0`) больше никогда не выполнялось — оружие "залипало" намертво.
+// Теперь `reloadingWeapon` хранит, ЧТО именно перезаряжается, независимо от
+// того, что сейчас выбрано в руках — обойма пополняется именно ему.
 function startShotgunReload() {
-    isReloading = true; reloadTimer = 1.2; reloadTotalDuration = 1.2; reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)"; playReloadSound(); updateWeaponVisibility();
+    isReloading = true; reloadingWeapon = 'shotgun'; reloadTimer = 1.2; reloadTotalDuration = 1.2;
+    if (currentWeapon === 'shotgun') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
+    playReloadSound(); updateWeaponVisibility();
 }
 function startRifleReload() {
-    isReloading = true; reloadTimer = 1.8; reloadTotalDuration = 1.8; reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)"; playReloadSound(); updateWeaponVisibility();
+    isReloading = true; reloadingWeapon = 'rifle'; reloadTimer = 1.8; reloadTotalDuration = 1.8;
+    if (currentWeapon === 'rifle') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
+    playReloadSound(); updateWeaponVisibility();
 }
 function startMinigunReload() {
-    isReloading = true; reloadTimer = 2.6; reloadTotalDuration = 2.6; reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)"; playReloadSound(); updateWeaponVisibility();
+    isReloading = true; reloadingWeapon = 'minigun'; reloadTimer = 2.6; reloadTotalDuration = 2.6;
+    if (currentWeapon === 'minigun') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
+    playReloadSound(); updateWeaponVisibility();
 }
 function startPistolReload() {
-    isReloading = true; reloadTimer = 0.9; reloadTotalDuration = 0.9; reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)"; playReloadSound(); updateWeaponVisibility();
+    isReloading = true; reloadingWeapon = 'pistol'; reloadTimer = 0.9; reloadTotalDuration = 0.9;
+    if (currentWeapon === 'pistol') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
+    playReloadSound(); updateWeaponVisibility();
 }
 function startSniperReload() {
     // ДОЛГАЯ ПЕРЕЗАРЯДКА: у снайперской винтовки самое долгое время перезарядки из всего арсенала
-    isReloading = true; reloadTimer = 3.2; reloadTotalDuration = 3.2; reloadUi.innerText = "(ДОЛГАЯ ПЕРЕЗАРЯДКА...)"; playReloadSound(); updateWeaponVisibility();
+    isReloading = true; reloadingWeapon = 'sniper'; reloadTimer = 3.2; reloadTotalDuration = 3.2;
+    if (currentWeapon === 'sniper') reloadUi.innerText = "(ДОЛГАЯ ПЕРЕЗАРЯДКА...)";
+    playReloadSound(); updateWeaponVisibility();
 }
 function startFlamethrowerRefuel() {
-    isReloading = true; reloadTimer = 2.0; reloadTotalDuration = 2.0; reloadUi.innerText = "(ЗАПРАВКА...)"; playReloadSound(); updateWeaponVisibility();
+    isReloading = true; reloadingWeapon = 'flamethrower'; reloadTimer = 2.0; reloadTotalDuration = 2.0;
+    if (currentWeapon === 'flamethrower') reloadUi.innerText = "(ЗАПРАВКА...)";
+    playReloadSound(); updateWeaponVisibility();
 }
 
 function checkHit(fovSpread, damage, maxRange, useTracer) {
@@ -2541,7 +2716,14 @@ function update(dt) {
         document.getElementById("death-overlay").style.display = 'flex'; document.exitPointerLock(); return;
     }
     isChainsawActive = false; // сбрасывается каждый кадр; executeShot() выставит true, если бензопила реально атакует
-    if (isMouseDown) executeShot(dt);
+    if (isMouseDown) {
+        if (currentWeapon === 'gauss') { if (gaussCharging) updateGaussCharging(dt); }
+        else executeShot(dt);
+    }
+    // Если игрок переключился на другое оружие, пока копился заряд Гаусс-винтовки (клавиши 1-8/M),
+    // зарядка отменяется БЕЗ выстрела — оружие в руках сменилось, отпускание ЛКМ больше не должно
+    // производить взрыв гаусс-винтовки.
+    if (gaussCharging && currentWeapon !== 'gauss') { gaussCharging = false; gaussChargePercent = 0; updateGaussChargeUi(); }
     if (messageTimer > 0) messageTimer -= dt;
     // ВОССТАНОВЛЕНИЕ ЗАРЯДА БЕНЗОПИЛЫ, КОГДА ОНА НЕ АТАКУЕТ
     if (meleeTier === 2 && !isChainsawActive && chainsawCharge < maxChainsawCharge) {
@@ -2600,7 +2782,6 @@ function update(dt) {
     if (minigunFireRateTimer > 0) minigunFireRateTimer -= dt;
     if (pistolFireRateTimer > 0) pistolFireRateTimer -= dt;
     if (meleeCooldownTimer > 0) meleeCooldownTimer -= dt;
-    if (gaussFireTimer > 0) gaussFireTimer -= dt;
     if (isShooting) { shootTimer += dt * 16; if (shootTimer > 4) isShooting = false; }
     walkCycle += isMoving ? dt * 11 : 0;
 
@@ -2617,27 +2798,39 @@ function update(dt) {
         // ВРАЩЕНИЕ ЗНАЧКА "МОДЕЛИ ПЕРЕЗАРЯДКИ" ПОКА ОНА АКТИВНА
         if (weaponMeshes.reloadIcon && weaponMeshes.reloadIcon.visible) weaponMeshes.reloadIcon.rotation.z -= dt * 6;
         if (reloadTimer <= 0) {
-            isReloading = false; reloadUi.innerText = "";
-            if (currentWeapon === 'shotgun') {
-                shotgunClip = Math.min(maxShotgunClip, ammo);
-                weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`;
-            } else if (currentWeapon === 'rifle') {
-                rifleClip = Math.min(maxRifleClip, ammo);
-                weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/${maxRifleClip})`;
-            } else if (currentWeapon === 'minigun') {
-                minigunClip = Math.min(maxMinigunClip, ammo);
-                weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`;
-            } else if (currentWeapon === 'pistol') {
-                pistolClip = Math.min(maxPistolClip, ammo);
-                weaponUi.innerText = `ПИСТОЛЕТ [5] (${pistolClip}/${maxPistolClip})`;
-            } else if (currentWeapon === 'sniper') {
-                sniperClip = Math.min(maxSniperClip, ammo);
-                weaponUi.innerText = `СНАЙПЕРКА [6] (${sniperClip}/${maxSniperClip})`;
-            } else if (currentWeapon === 'flamethrower') {
-                flamethrowerFuel = maxFlamethrowerFuel;
-                weaponUi.innerText = `ОГНЕМЁТ [7] (${Math.ceil(flamethrowerFuel)}/${maxFlamethrowerFuel})`;
-            }
+            // ИСПРАВЛЕНИЕ БАГА: пополняем обойму именно reloadingWeapon (тому оружию, которое
+            // реально перезаряжалось), а НЕ currentWeapon — игрок мог успеть переключиться на
+            // другое оружие, пока шла перезарядка.
+            const justReloaded = reloadingWeapon;
+            isReloading = false; reloadingWeapon = null;
+            if (currentWeapon === justReloaded) reloadUi.innerText = "";
+            if (justReloaded === 'shotgun') { shotgunClip = Math.min(maxShotgunClip, ammo); }
+            else if (justReloaded === 'rifle') { rifleClip = Math.min(maxRifleClip, ammo); }
+            else if (justReloaded === 'minigun') { minigunClip = Math.min(maxMinigunClip, ammo); }
+            else if (justReloaded === 'pistol') { pistolClip = Math.min(maxPistolClip, ammo); }
+            else if (justReloaded === 'sniper') { sniperClip = Math.min(maxSniperClip, ammo); }
+            else if (justReloaded === 'flamethrower') { flamethrowerFuel = maxFlamethrowerFuel; }
+            // Обновляем строку оружия в HUD, только если игрок сейчас держит именно перезаряженное оружие
+            if (currentWeapon === 'shotgun') weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`;
+            else if (currentWeapon === 'rifle') weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/${maxRifleClip})`;
+            else if (currentWeapon === 'minigun') weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`;
+            else if (currentWeapon === 'pistol') weaponUi.innerText = `ПИСТОЛЕТ [5] (${pistolClip}/${maxPistolClip})`;
+            else if (currentWeapon === 'sniper') weaponUi.innerText = `СНАЙПЕРКА [6] (${sniperClip}/${maxSniperClip})`;
+            else if (currentWeapon === 'flamethrower') weaponUi.innerText = `ОГНЕМЁТ [7] (${Math.ceil(flamethrowerFuel)}/${maxFlamethrowerFuel})`;
             updateWeaponVisibility();
+        }
+    } else {
+        // СТРАХОВОЧНАЯ СЕТКА: если по каким-то причинам оружие в руках стоит с пустой обойدой,
+        // есть патроны в резерве, и перезарядка не запущена (например, игрок только что
+        // переключился на него) — запускаем перезарядку автоматически, а не оставляем оружие
+        // "залипшим" намертво без возможности выстрелить или перезарядиться.
+        if (ammo > 0) {
+            if (currentWeapon === 'shotgun' && shotgunClip <= 0) startShotgunReload();
+            else if (currentWeapon === 'rifle' && rifleClip <= 0) startRifleReload();
+            else if (currentWeapon === 'minigun' && minigunClip <= 0) startMinigunReload();
+            else if (currentWeapon === 'pistol' && pistolClip <= 0) startPistolReload();
+            else if (currentWeapon === 'sniper' && sniperClip <= 0) startSniperReload();
+            else if (currentWeapon === 'flamethrower' && flamethrowerFuel <= 0) startFlamethrowerRefuel();
         }
     }
 
@@ -2788,7 +2981,7 @@ function update(dt) {
                 if (currentWeapon === 'gauss') weaponUi.innerText = `ГАУСС-ВИНТОВКА [8] (${gaussCharges} ЗАРЯДОВ)`;
                 updateInventoryUI();
             }
-            else { ammo = Math.min(200, ammo + 35); ammoUi.innerText = ammo; }
+            else { ammo = Math.min(200, ammo + STANDARD_AMMO_PICKUP_AMOUNT); ammoUi.innerText = ammo; }
             return false;
         }
         return true;
@@ -3058,7 +3251,7 @@ function render3D() {
         // ВРАЩЕНИЕ ЦЕПИ БЕНЗОПИЛЫ, БЫСТРЕЕ ВО ВРЕМЯ АТАКИ
         weaponMeshes.chainsawChain.rotation.z += isChainsawActive ? 1.4 : 0.15;
     }
-    weaponPivot.position.set(swayX, (isReloading ? -0.3 : 0) + recoilY, recoilZ);
+    weaponPivot.position.set(swayX, ((isReloading && reloadingWeapon === currentWeapon) ? -0.3 : 0) + recoilY, recoilZ);
     syncEntitiesWith3DScene();
     // ПРИНУДИТЕЛЬНОЕ ВЫРАВНИВАНИЕ ПОЛОСОК ЗДОРОВЬЯ ПО КАМЕРЕ ПРЯМО ПЕРЕД РЕНДЕРОМ — второй,
     // гарантирующий проход поверх quaternion.copy() внутри syncEntitiesWith3DScene(). Health bar
