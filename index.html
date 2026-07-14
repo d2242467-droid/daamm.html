@@ -54,6 +54,18 @@
             border-radius: 4px;
             border: 2px solid #221122;
         }
+        /* СТАМИНА: горизонтальная полоска в HUD (расходуется спринтом Shift и щитом N) */
+        #stamina-bar-container {
+            display: inline-block; vertical-align: middle;
+            width: 90px; height: 12px; margin-left: 6px;
+            border: 2px solid #ffd23a; border-radius: 3px;
+            background: rgba(0, 0, 0, 0.55); overflow: hidden;
+        }
+        #stamina-bar-fill {
+            height: 100%; width: 100%;
+            background: linear-gradient(90deg, #ffd23a, #ff9f1c);
+            transition: width 0.08s linear, background-color 0.15s linear;
+        }
         #boss-ui { 
             color: #ff0055; 
             font-size: 24px; 
@@ -453,6 +465,7 @@
 
     <div id="ui">
         <div>ЗДОРОВЬЕ: <span id="health-val">100</span>%</div>
+        <div>СТАМИНА: <span id="stamina-bar-container"><span id="stamina-bar-fill"></span></span></div>
         <div>ОРУЖИЕ: <span id="weapon-name" style="color: #fff;">ДРОБОВИК [1] (2/2)</span></div>
         <div>ПАТРОНЫ: <span id="ammo-val">100</span> <span id="reload-msg" style="color: yellow;"></span></div>
         <div>ГРАНАТЫ: <span id="grenade-val" style="color:#ffaa55;">ГРАНАТА (0) [Q]</span></div>
@@ -478,6 +491,16 @@ const mctx = minimapCanvas.getContext("2d");
 const ammoUi = document.getElementById("ammo-val");
 const healthUi = document.getElementById("health-val");
 const scoreUi = document.getElementById("score-val");
+const staminaBarFillUi = document.getElementById("stamina-bar-fill");
+// ОБНОВЛЯЕТ ШИРИНУ И ЦВЕТ ГОРИЗОНТАЛЬНОЙ ПОЛОСКИ СТАМИНЫ В HUD (0-100%).
+// Цвет предупреждает игрока: жёлто-оранжевый в норме, красный при низком запасе (<25%).
+function updateStaminaUi() {
+    const pct = Math.max(0, Math.min(100, (stamina / STAMINA_MAX) * 100));
+    staminaBarFillUi.style.width = pct + '%';
+    staminaBarFillUi.style.background = pct < 25
+        ? 'linear-gradient(90deg, #ff3b3b, #b30000)'
+        : 'linear-gradient(90deg, #ffd23a, #ff9f1c)';
+}
 const weaponUi = document.getElementById("weapon-name");
 const bossUi = document.getElementById("boss-ui");
 const bossHpUi = document.getElementById("boss-hp");
@@ -788,6 +811,21 @@ let isOnGround = true;
 let isPlayerHidden = false;
 const GRAVITY = 20.0;
 const JUMP_VELOCITY = 12.0; // +50% (было 8.0)
+
+// ==========================================================================
+// СИСТЕМА ВЫНОСЛИВОСТИ (СТАМИНЫ): спринт (Shift) и щит (N) расходуют общий
+// запас стамины 0-100; вне расхода стамина восстанавливается сама.
+// ==========================================================================
+let stamina = 100;                      // 0-100
+const STAMINA_MAX = 100;
+const STAMINA_REGEN_RATE = 10;          // очков стамины в секунду, когда ничего не расходуется
+const SPRINT_STAMINA_DRAIN_RATE = 10;   // очков стамины в секунду при спринте (Shift)
+const SPRINT_SPEED_MULTIPLIER = 1.15;   // +15% к скорости движения при спринте
+const SPRINT_RELOAD_MULTIPLIER = 0.85;  // -15% к длительности перезарядки при спринте
+const SHIELD_STAMINA_DRAIN_RATE = 20 / 1.5; // 20 стамины за 1.5 сек = ровно 13.33... в секунду
+let isSprinting = false;                // true, пока зажат Shift И stamina > 0
+let isShieldActive = false;             // true, пока зажата N И stamina > 0 — даёт полную неуязвимость (см. takeDamage())
+
 
 const DIFFICULTY_SETTINGS = {
     EASY:   { label: "ЛЕГКО (КЛАССИКА)",  spawnInterval: 20, creeperHp: 50,  skeletonHp: 100, flyerHp: 100, spiderHp: 70,  bruteHp: 0,   bossHp: 800,  flyingEnemies: false, flyingBoss: false, spidersEnabled: false, brutesEnabled: false },
@@ -1953,6 +1991,7 @@ function returnToMainMenu() {
     const spawn = findOpenSpawnCell(3, 3);
     playerX = spawn.x; playerY = spawn.y; playerAngle = 0.0; playerPitch = 0.0; playerZ = 0; playerVelZ = 0; isOnGround = true;
     health = 100; maxHealth = 100; damageMultiplier = 1.0; score = 0; ammo = 100;
+    stamina = STAMINA_MAX; isSprinting = false; isShieldActive = false; updateStaminaUi();
     maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; maxPistolClip = 12; maxSniperClip = 5; maxFlamethrowerFuel = 100;
     shotgunClip = 2; rifleClip = 30; minigunClip = 100; pistolClip = 12; sniperClip = 5; flamethrowerFuel = 100;
     currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadingWeapon = null; reloadTimer = 0; meleeCooldownTimer = 0; pistolFireRateTimer = 0; flamethrowerTickTimer = 0; hardBossKillCount = 0;
@@ -2178,6 +2217,7 @@ function startGame(chosenDifficulty, chosenMapKey) {
     if (mapBlocksGroup) rebuild3DMap();
     const spawn = findOpenSpawnCell(3, 3);
     playerX = spawn.x; playerY = spawn.y; playerAngle = 0.0; playerPitch = 0.0;
+    stamina = STAMINA_MAX; isSprinting = false; isShieldActive = false; updateStaminaUi();
     pickups = pickups.filter(p => p.type !== 'coin'); spawnMapCoins(MAX_MAP_COINS); coinRespawnTimer = COIN_RESPAWN_INTERVAL;
     screenShakeTimer = 0; damageVignetteTimer = 0;
     const dvEl = document.getElementById("damage-vignette"); if (dvEl) dvEl.style.opacity = 0;
@@ -2194,6 +2234,7 @@ function restartGame() {
     if (multiplayer.enabled) {
         if (multiplayer.ws && multiplayer.ws.readyState === WebSocket.OPEN) multiplayer.ws.send(JSON.stringify({ type: 'respawn' }));
         playerZ = 0; playerVelZ = 0; isOnGround = true; ammo = 100; shotgunClip = maxShotgunClip; rifleClip = maxRifleClip; minigunClip = maxMinigunClip; isReloading = false; reloadingWeapon = null; reloadTimer = 0; meleeCooldownTimer = 0;
+        stamina = STAMINA_MAX; isSprinting = false; isShieldActive = false; updateStaminaUi();
         resetMinigunState();
         thrownGrenades = []; fireZones = [];
         projectiles = []; particles = []; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
@@ -2203,6 +2244,7 @@ function restartGame() {
     const spawn = findOpenSpawnCell(3, 3);
     playerX = spawn.x; playerY = spawn.y; playerAngle = 0.0; playerPitch = 0.0; playerZ = 0; playerVelZ = 0; isOnGround = true;
     health = 100; maxHealth = 100; damageMultiplier = 1.0; score = 0; ammo = 100;
+    stamina = STAMINA_MAX; isSprinting = false; isShieldActive = false; updateStaminaUi();
     maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; maxPistolClip = 12; maxSniperClip = 5; maxFlamethrowerFuel = 100;
     shotgunClip = 2; rifleClip = 30; minigunClip = 100; pistolClip = 12; sniperClip = 5; flamethrowerFuel = 100;
     currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadingWeapon = null; reloadTimer = 0; meleeCooldownTimer = 0; pistolFireRateTimer = 0; flamethrowerTickTimer = 0; hardBossKillCount = 0;
@@ -2404,6 +2446,7 @@ function detonateGrenade(g) {
 // длительного урона (лазер босса, огненная зона и т.п.), в отличие от
 // тряски/виньетки, которые уместны при любом уроне.
 function takeDamage(amount) {
+    if (isShieldActive) return; // ЩИТ: полная неуязвимость ко всему урону, пока активен
     if (!(amount > 0) || health <= 0) return;
     health = Math.max(0, health - amount);
     healthUi.innerText = Math.floor(health);
@@ -2903,13 +2946,18 @@ function spawnTracer(hitDistance) {
 // (`XClip > 0`) больше никогда не выполнялось — оружие "залипало" намертво.
 // Теперь `reloadingWeapon` хранит, ЧТО именно перезаряжается, независимо от
 // того, что сейчас выбрано в руках — обойма пополняется именно ему.
+// СПРИНТ-БОНУС К ПЕРЕЗАРЯДКЕ: пока активен спринт (Shift + стамина > 0), время
+// перезарядки/дозаправки любого оружия умножается на SPRINT_RELOAD_MULTIPLIER (-15%).
+function getReloadTime(baseTime) {
+    return isSprinting ? baseTime * SPRINT_RELOAD_MULTIPLIER : baseTime;
+}
 function startShotgunReload() {
-    isReloading = true; reloadingWeapon = 'shotgun'; reloadTimer = 1.2; reloadTotalDuration = 1.2;
+    isReloading = true; reloadingWeapon = 'shotgun'; reloadTimer = getReloadTime(1.2); reloadTotalDuration = reloadTimer;
     if (currentWeapon === 'shotgun') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
     playReloadSound(); updateWeaponVisibility();
 }
 function startRifleReload() {
-    isReloading = true; reloadingWeapon = 'rifle'; reloadTimer = 1.8; reloadTotalDuration = 1.8;
+    isReloading = true; reloadingWeapon = 'rifle'; reloadTimer = getReloadTime(1.8); reloadTotalDuration = reloadTimer;
     if (currentWeapon === 'rifle') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
     playReloadSound(); updateWeaponVisibility();
 }
@@ -2920,26 +2968,27 @@ function resetMinigunState() {
     minigunSpinDownTimer = 0; minigunWasHeld = false;
 }
 function startMinigunReload() {
-    isReloading = true; reloadingWeapon = 'minigun'; reloadTimer = 2.6; reloadTotalDuration = 2.6;
+    isReloading = true; reloadingWeapon = 'minigun'; reloadTimer = getReloadTime(2.6); reloadTotalDuration = reloadTimer;
     if (currentWeapon === 'minigun') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
     playReloadSound(); updateWeaponVisibility();
 }
 function startPistolReload() {
-    isReloading = true; reloadingWeapon = 'pistol'; reloadTimer = 0.9; reloadTotalDuration = 0.9;
+    isReloading = true; reloadingWeapon = 'pistol'; reloadTimer = getReloadTime(0.9); reloadTotalDuration = reloadTimer;
     if (currentWeapon === 'pistol') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
     playReloadSound(); updateWeaponVisibility();
 }
 function startSniperReload() {
     // ДОЛГАЯ ПЕРЕЗАРЯДКА: у снайперской винтовки самое долгое время перезарядки из всего арсенала
-    isReloading = true; reloadingWeapon = 'sniper'; reloadTimer = 3.2; reloadTotalDuration = 3.2;
+    isReloading = true; reloadingWeapon = 'sniper'; reloadTimer = getReloadTime(3.2); reloadTotalDuration = reloadTimer;
     if (currentWeapon === 'sniper') reloadUi.innerText = "(ДОЛГАЯ ПЕРЕЗАРЯДКА...)";
     playReloadSound(); updateWeaponVisibility();
 }
 function startFlamethrowerRefuel() {
-    isReloading = true; reloadingWeapon = 'flamethrower'; reloadTimer = 2.0; reloadTotalDuration = 2.0;
+    isReloading = true; reloadingWeapon = 'flamethrower'; reloadTimer = getReloadTime(2.0); reloadTotalDuration = reloadTimer;
     if (currentWeapon === 'flamethrower') reloadUi.innerText = "(ЗАПРАВКА...)";
     playReloadSound(); updateWeaponVisibility();
 }
+
 
 // СНАЙПЕРСКАЯ ВИНТОВКА: дальность и урон, зависящий от дистанции до цели.
 // Дальность увеличена на 20% относительно прежнего значения (40 -> 48).
@@ -3119,6 +3168,39 @@ function update(dt) {
         document.getElementById("death-overlay").style.display = 'flex'; document.exitPointerLock(); return;
     }
     isChainsawActive = false; // сбрасывается каждый кадр; executeShot() выставит true, если бензопила реально атакует
+
+    // ==========================================================================
+    // ОБНОВЛЕНИЕ СТАМИНЫ: спринт (Shift) и щит (N) МОГУТ расходовать стамину
+    // одновременно из общего пула. Восстановление идёт, только когда НИ ОДНА
+    // из способностей не расходует стамину в этом кадре.
+    // ==========================================================================
+    const shiftHeld = keys['ShiftLeft'] || keys['ShiftRight'];
+    const shieldKeyHeld = keys['KeyN'];
+    // Способность включается, только если стамина ещё есть НА НАЧАЛО кадра —
+    // при stamina <= 0 клавиша просто не активирует спринт/щит.
+    isSprinting = !!shiftHeld && stamina > 0;
+    isShieldActive = !!shieldKeyHeld && stamina > 0;
+    let staminaDrainThisFrame = 0;
+    if (isSprinting) staminaDrainThisFrame += SPRINT_STAMINA_DRAIN_RATE;
+    if (isShieldActive) staminaDrainThisFrame += SHIELD_STAMINA_DRAIN_RATE;
+    if (staminaDrainThisFrame > 0) {
+        stamina -= staminaDrainThisFrame * dt;
+        // ПОРОГОВАЯ ПРОВЕРКА ВМЕСТО ТОЧНОГО РАВЕНСТВА: `stamina` — число с плавающей
+        // точкой и почти никогда не достигнет РОВНО 0 из-за периодических дробей
+        // (13.33...). Сравнение `stamina === 0` привело бы к "бесконечному щиту":
+        // стамина уходила бы в мелкий минус, флаг щита не сбрасывался бы, а урон
+        // продолжал бы блокироваться. Поэтому используется `stamina <= 0`, и при
+        // срабатывании обе способности принудительно и немедленно отключаются.
+        if (stamina <= 0) {
+            stamina = 0;
+            isSprinting = false;
+            isShieldActive = false;
+        }
+    } else if (stamina < STAMINA_MAX) {
+        stamina = Math.min(STAMINA_MAX, stamina + STAMINA_REGEN_RATE * dt);
+    }
+    updateStaminaUi();
+
     if (isMouseDown) {
         if (currentWeapon === 'gauss') { if (gaussCharging) updateGaussCharging(dt); }
         else executeShot(dt);
@@ -3161,7 +3243,7 @@ function update(dt) {
     }
 
     // УСКОРЕНИЕ ПРИ АКТИВНОЙ АТАКЕ БЕНЗОПИЛОЙ
-    const moveSpeed = 4.2 * (isChainsawActive ? CHAINSAW_SPEED_MULTIPLIER : 1) * dt; const rotSpeed = 2.4 * dt;
+    const moveSpeed = 4.2 * (isChainsawActive ? CHAINSAW_SPEED_MULTIPLIER : 1) * (isSprinting ? SPRINT_SPEED_MULTIPLIER : 1) * dt; const rotSpeed = 2.4 * dt;
     if (keys['ArrowLeft'])  playerAngle -= rotSpeed; if (keys['ArrowRight']) playerAngle += rotSpeed;
     let newX = playerX; let newY = playerY; isMoving = false;
     if (keys['KeyW'] || keys['ArrowUp']) { newX += Math.cos(playerAngle) * moveSpeed; newY += Math.sin(playerAngle) * moveSpeed; isMoving = true; }
