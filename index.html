@@ -237,7 +237,7 @@
 <body>
 
     <button id="audio-toggle" onclick="toggleAudio()">МУЗЫКА: ВЫКЛ</button>
-    <div id="boss-ui">⚠ ВНИМАНИЕ: БОСС БЛИЗКО (HP: <span id="boss-hp">1000</span>/1000) ⚠</div>
+    <div id="boss-ui">⚠ ВНИМАНИЕ: БОСС БЛИЗКО (HP: <span id="boss-hp">1000</span>/<span id="boss-hp-max">1000</span>) ⚠</div>
     <div id="flash-overlay"></div>
     
     <div id="game-container">
@@ -263,6 +263,7 @@
                 <button class="map-select-btn btn" data-mapkey="OPEN" style="background:#333; box-shadow:0 4px 0 #111; font-size:11px; padding:6px 12px;" onclick="selectMap('OPEN')">ОТКРЫТАЯ АРЕНА</button>
                 <button class="map-select-btn btn" data-mapkey="KALEIDOSCOPE" style="background:#333; box-shadow:0 4px 0 #111; font-size:11px; padding:6px 12px;" onclick="selectMap('KALEIDOSCOPE')">КАЛЕЙДОСКОП</button>
                 <button class="map-select-btn btn" data-mapkey="STAR_ARENA" style="background:#333; box-shadow:0 4px 0 #111; font-size:11px; padding:6px 12px;" onclick="selectMap('STAR_ARENA')">ЗВЁЗДНАЯ АРЕНА</button>
+                <button class="map-select-btn btn" data-mapkey="EMERALD_RING" style="background:#333; box-shadow:0 4px 0 #111; font-size:11px; padding:6px 12px;" onclick="selectMap('EMERALD_RING')">ИЗУМРУДНОЕ КОЛЬЦО</button>
             </div>
             <p class="text-[#e0aaff] mb-2 text-sm">Выберите сложность (влияет только на врагов, не на карту):</p>
             <div class="flex gap-3 mb-4">
@@ -400,6 +401,7 @@ const scoreUi = document.getElementById("score-val");
 const weaponUi = document.getElementById("weapon-name");
 const bossUi = document.getElementById("boss-ui");
 const bossHpUi = document.getElementById("boss-hp");
+const bossHpMaxUi = document.getElementById("boss-hp-max");
 const reloadUi = document.getElementById("reload-msg");
 const stealthIndicatorEl = document.getElementById("stealth-indicator");
 
@@ -621,17 +623,55 @@ const MAPS = {
     1,0,6,6,6,0,0,0,0,0,0,0,6,6,0,0,0,0,6,6,0,0,0,0,0,0,0,6,6,6,0,1,
     1,0,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,6,0,1,
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    ],
+    // 7. Изумрудное Кольцо / Emerald Ring (новая карта из закреплённого изображения:
+    // серые стены (тип 1), зелёная "вода" (тип 7) складывается в кольцо и ромбы,
+    // синие "кусты" (тип 8) разбросаны симметричными кластерами)
+    EMERALD_RING: [
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,
+    1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,7,7,7,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,7,7,7,7,7,0,0,0,0,0,0,0,0,0,0,7,7,7,7,7,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,7,7,7,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,7,0,0,8,0,0,7,0,0,7,0,0,8,0,0,7,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,8,0,8,8,7,7,7,7,7,7,7,7,8,8,0,8,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,8,8,8,0,7,7,7,0,0,0,0,7,7,7,0,8,8,8,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,8,0,0,7,7,0,0,0,0,0,0,7,7,0,0,8,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,8,0,0,0,7,7,0,0,0,0,0,0,0,0,7,7,0,0,0,8,0,0,0,0,0,1,
+    1,0,0,0,0,8,8,8,0,0,0,7,0,0,0,0,0,0,0,0,7,0,0,0,8,8,8,0,0,0,0,1,
+    1,0,0,0,0,8,8,8,0,0,0,7,0,0,0,0,0,0,0,0,7,0,0,0,8,8,8,0,0,0,0,1,
+    1,0,0,0,0,0,8,0,0,0,7,7,0,0,0,0,0,0,0,0,7,7,0,0,0,8,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,8,0,0,7,7,0,0,0,0,0,0,7,7,0,0,8,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,8,8,8,0,7,7,7,0,0,0,0,7,7,7,0,8,8,8,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,8,0,8,8,7,7,7,7,7,7,7,7,8,8,0,8,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,7,0,0,8,0,0,7,0,0,7,0,0,8,0,0,7,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,7,7,7,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,7,7,7,7,7,0,0,0,0,0,0,0,0,0,0,7,7,7,7,7,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,7,7,7,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,
+    1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
     ]
 };
 // СПИСОК КАРТ, ОТДЕЛЁННЫЙ ОТ СЛОЖНОСТИ: любая карта теперь доступна на любой сложности
-const MAP_KEYS = ['EASY', 'MEDIUM', 'HARD', 'OPEN', 'KALEIDOSCOPE', 'STAR_ARENA'];
+const MAP_KEYS = ['EASY', 'MEDIUM', 'HARD', 'OPEN', 'KALEIDOSCOPE', 'STAR_ARENA', 'EMERALD_RING'];
 const MAP_LABELS = {
     EASY: 'КЛАССИКА',
     MEDIUM: 'ШОРОХ ЛИСТЬЕВ',
     HARD: 'АРЕНА ХАОСА',
     OPEN: 'ОТКРЫТАЯ АРЕНА',
     KALEIDOSCOPE: 'КАЛЕЙДОСКОП',
-    STAR_ARENA: 'ЗВЁЗДНАЯ АРЕНА'
+    STAR_ARENA: 'ЗВЁЗДНАЯ АРЕНА',
+    EMERALD_RING: 'ИЗУМРУДНОЕ КОЛЬЦО'
 };
 let currentMapKey = 'EASY';
 let map = MAPS[currentMapKey].slice();
@@ -670,14 +710,14 @@ const GRAVITY = 20.0;
 const JUMP_VELOCITY = 12.0; // +50% (было 8.0)
 
 const DIFFICULTY_SETTINGS = {
-    EASY:   { label: "ЛЕГКО (КЛАССИКА)",  spawnInterval: 20, creeperHp: 50,  skeletonHp: 100, flyerHp: 100, spiderHp: 70,  bruteHp: 0,   bossHp: 1000, flyingEnemies: false, flyingBoss: false, spidersEnabled: false, brutesEnabled: false },
-    MEDIUM: { label: "СРЕДНЕ (ШОРОХ ЛИСТЬЕВ)", spawnInterval: 10, creeperHp: 200, skeletonHp: 200, flyerHp: 200, spiderHp: 150, bruteHp: 350, bossHp: 2000, flyingEnemies: true,  flyingBoss: false, spidersEnabled: true,  brutesEnabled: false },
-    HARD:   { label: "СЛОЖНО (АРЕНА ХАОСА)",   spawnInterval: 10, creeperHp: 500, skeletonHp: 500, flyerHp: 500, spiderHp: 400, bruteHp: 900, bossHp: 5000, flyingEnemies: true,  flyingBoss: true,  spidersEnabled: true,  brutesEnabled: true  }
+    EASY:   { label: "ЛЕГКО (КЛАССИКА)",  spawnInterval: 20, creeperHp: 50,  skeletonHp: 100, flyerHp: 100, spiderHp: 70,  bruteHp: 0,   bossHp: 800,  flyingEnemies: false, flyingBoss: false, spidersEnabled: false, brutesEnabled: false },
+    MEDIUM: { label: "СРЕДНЕ (ШОРОХ ЛИСТЬЕВ)", spawnInterval: 10, creeperHp: 200, skeletonHp: 200, flyerHp: 200, spiderHp: 150, bruteHp: 350, bossHp: 1600, flyingEnemies: true,  flyingBoss: false, spidersEnabled: true,  brutesEnabled: false },
+    HARD:   { label: "СЛОЖНО (АРЕНА ХАОСА)",   spawnInterval: 10, creeperHp: 500, skeletonHp: 500, flyerHp: 500, spiderHp: 400, bruteHp: 900, bossHp: 4000, flyingEnemies: true,  flyingBoss: true,  spidersEnabled: true,  brutesEnabled: true  }
 };
 let difficulty = 'EASY';
 
 const multiplayer = { enabled: false, ws: null, myId: null, players: {}, inputSendTimer: 0 };
-let weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false };
+let weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
 let shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
 
 // МАГАЗИН: МАКС. ЁМКОСТЬ ОБОЙМ (растёт при покупке в магазине)
@@ -696,6 +736,13 @@ let minigunClip = 100;
 let pistolClip = 12;
 let sniperClip = 5;
 let flamethrowerFuel = 100;
+// ГАУСС-ВИНТОВКА: секретное оружие, НЕ продаётся в магазине — выпадает только с боссов.
+// Вместо обоймы использует "заряды" (gaussCharges), пополняемые дропом с боссов.
+let gaussCharges = 0;
+let gaussFireTimer = 0;
+const GAUSS_FIRE_DELAY = 0.5; // задержка между выстрелами (сек)
+const BASE_GAUSS_DAMAGE = 140; // урон каждой цели, пробиваемой лучом (не убывает с числом целей)
+const GAUSS_CHARGES_PER_DROP = 6; // сколько зарядов даёт один дроп с босса
 let isShooting = false;
 let shootTimer = 0;
 let walkCycle = 0;
@@ -866,9 +913,13 @@ let scene, camera, renderer, torchLight, muzzleLight;
 let muzzleFlashTimer = 0;
 const MUZZLE_FLASH_DURATION = 0.09;
 let mapBlocksGroup;
+// Плоский список мешей стен (без воды/куста/платформ) для проверки линии
+// видимости врагов через Raycaster в системе скрытности (см. rebuild3DMap()
+// и isWallBetween() ниже). Заполняется заново при каждой пересборке карты.
+let wallMeshes = [];
 let weaponPivot; 
 const entityMeshes = new Map(); 
-let weaponMeshes = { shotgun: null, rifle: null, rocket: null, minigun: null, fist: null, knife: null, chainsaw: null, chainsawChain: null, pistol: null, sniper: null, flamethrower: null, reloadIcon: null };
+let weaponMeshes = { shotgun: null, rifle: null, rocket: null, minigun: null, fist: null, knife: null, chainsaw: null, chainsawChain: null, pistol: null, sniper: null, flamethrower: null, gauss: null, reloadIcon: null };
 const textures = {};
 
 function makeProceduralNoiseTexture(colorBase, countX=16, countY=16) {
@@ -1079,6 +1130,7 @@ function rebuild3DMap() {
     while(mapBlocksGroup.children.length > 0) {
         mapBlocksGroup.remove(mapBlocksGroup.children[0]);
     }
+    wallMeshes = []; // сбрасываем список стен для Raycaster-проверок скрытности
     const boxGeometryStandard = new THREE.BoxGeometry(1, 2, 1);
     const boxGeometryPlatform = new THREE.BoxGeometry(1, 1, 1);
     const waterGeometry = new THREE.BoxGeometry(1, 0.1, 1);
@@ -1111,6 +1163,8 @@ function rebuild3DMap() {
                 const block = new THREE.Mesh(geom, blockMat);
                 block.position.set(x + 0.5, hY, z + 0.5);
                 mapBlocksGroup.add(block);
+                // ТОЛЬКО полноразмерные стены блокируют линию видимости (низкая платформа cellVal===6 - нет)
+                if (cellVal !== 6) wallMeshes.push(block);
             }
         }
     }
@@ -1219,6 +1273,24 @@ function create3DWeapons() {
     fNozzleTip.rotation.x = -Math.PI / 2; fNozzleTip.position.set(0.05, 0, -0.29); flameGroup.add(fNozzleTip);
     flameGroup.position.set(0.2, -0.22, -0.35); flameGroup.visible = false; weaponPivot.add(flameGroup); weaponMeshes.flamethrower = flameGroup;
 
+    // ГАУСС-ВИНТОВКА: секретное оружие с боссов — длинный тёмный ствол с голубыми
+    // светящимися катушками (эффект электромагнитного разгона)
+    const gaussGroup = new THREE.Group();
+    const gBody = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.5), new THREE.MeshLambertMaterial({ color: 0x14161a }));
+    gaussGroup.add(gBody);
+    const gBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.35, 8), new THREE.MeshLambertMaterial({ color: 0x0a0a0c }));
+    gBarrel.rotation.x = Math.PI / 2; gBarrel.position.set(0, 0, -0.42); gaussGroup.add(gBarrel);
+    const coilMat = new THREE.MeshBasicMaterial({ color: 0x22e5ff });
+    for (let i = 0; i < 3; i++) {
+        const coil = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.008, 6, 12), coilMat);
+        coil.rotation.x = Math.PI / 2; coil.position.set(0, 0, -0.28 - i * 0.13); gaussGroup.add(coil);
+    }
+    const gGrip = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
+    gGrip.position.set(0, -0.07, 0.08); gaussGroup.add(gGrip);
+    const gCore = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), new THREE.MeshBasicMaterial({ color: 0x00eaff }));
+    gCore.position.set(0, 0.02, 0.08); gaussGroup.add(gCore); gaussGroup.userData.core = gCore;
+    gaussGroup.position.set(0.18, -0.2, -0.32); gaussGroup.visible = false; weaponPivot.add(gaussGroup); weaponMeshes.gauss = gaussGroup;
+
     // ИНДИКАТОР ПЕРЕЗАРЯДКИ: заменяющая "модель" оружия на время перезарядки (вращающийся значок)
     const reloadIconGroup = new THREE.Group();
     const ringGeo = new THREE.TorusGeometry(0.05, 0.008, 6, 16, Math.PI * 1.5);
@@ -1240,6 +1312,7 @@ function updateWeaponVisibility() {
     weaponMeshes.pistol.visible = (currentWeapon === 'pistol' && !isReloading);
     weaponMeshes.sniper.visible = (currentWeapon === 'sniper' && !isReloading);
     weaponMeshes.flamethrower.visible = (currentWeapon === 'flamethrower' && !isReloading);
+    weaponMeshes.gauss.visible = (currentWeapon === 'gauss');
     // ПЕРЕКЛЮЧЕНИЕ НА "МОДЕЛЬ ПЕРЕЗАРЯДКИ": во время перезарядки показываем вращающийся значок вместо оружия
     weaponMeshes.reloadIcon.visible = isReloading && ['shotgun', 'rifle', 'minigun', 'pistol', 'sniper', 'flamethrower'].includes(currentWeapon);
     updateInventoryUI();
@@ -1257,6 +1330,7 @@ function updateInventoryUI() {
         { key: 'pistol', code: '5', label: 'ПИСТОЛЕТ' },
         { key: 'sniper', code: '6', label: 'СНАЙПЕРКА' },
         { key: 'flamethrower', code: '7', label: 'ОГНЕМЁТ' },
+        { key: 'gauss', code: '8', label: 'ГАУСС-ВИНТОВКА' },
         { key: 'melee', code: 'M', label: MELEE_TIER_NAMES[meleeTier] }
     ];
     bar.innerHTML = slots.map(s => {
@@ -1275,14 +1349,19 @@ function updateInventoryUI() {
 
 function create3DHealthBar(type) {
     const group = new THREE.Group();
+    // depthTest:false + высокий renderOrder — полоска здоровья рисуется ПОВЕРХ модели врага,
+    // не перекрывается его телом независимо от того, что оказалось ближе к камере в буфере глубины.
     const bgGeo = new THREE.PlaneGeometry(0.6, 0.06);
-    const bgMat = new THREE.MeshBasicMaterial({ color: 0x111111, side: THREE.DoubleSide });
-    group.add(new THREE.Mesh(bgGeo, bgMat));
+    const bgMat = new THREE.MeshBasicMaterial({ color: 0x111111, side: THREE.DoubleSide, transparent: true, depthTest: false, depthWrite: false });
+    const bgMesh = new THREE.Mesh(bgGeo, bgMat); bgMesh.renderOrder = 998;
+    group.add(bgMesh);
     const fgGeo = new THREE.PlaneGeometry(0.6, 0.06); fgGeo.translate(0.3, 0, 0);
     const fgColor = (type === 'boss') ? 0xff0033 : 0x00ff33;
-    const fgMat = new THREE.MeshBasicMaterial({ color: fgColor, side: THREE.DoubleSide });
-    const fgMesh = new THREE.Mesh(fgGeo, fgMat); fgMesh.position.set(-0.3, 0, 0.002);
-    group.add(fgMesh); group.userData.fg = fgMesh; return group;
+    const fgMat = new THREE.MeshBasicMaterial({ color: fgColor, side: THREE.DoubleSide, transparent: true, depthTest: false, depthWrite: false });
+    const fgMesh = new THREE.Mesh(fgGeo, fgMat); fgMesh.position.set(-0.3, 0, 0.002); fgMesh.renderOrder = 999;
+    group.add(fgMesh); group.userData.fg = fgMesh;
+    group.renderOrder = 998;
+    return group;
 }
 
 function buildEnemyMesh(type, isFlyingBoss) {
@@ -1349,10 +1428,14 @@ function buildEnemyMesh(type, isFlyingBoss) {
         wingL.position.set(-0.3, 0.5, 0); group.add(wingL); const wingR = wingL.clone(); wingR.position.x = 0.3; group.add(wingR);
         animator = (time) => { const wingFlap = Math.sin(time * 12) * 0.6; wingL.rotation.z = wingFlap; wingR.rotation.z = -wingFlap; };
     }
+    // ПОЛОСКА ЗДОРОВЬЯ: НЕ добавляется как child этой group. group.rotation.y крутится каждый
+    // кадр лицом к игроку (см. syncEntitiesWith3DScene) — если бар был бы её ребёнком, его
+    // quaternion.copy(camera.quaternion) складывался бы с поворотом родителя и бар "уезжал" бы
+    // от направления на камеру. Вместо этого возвращаем его отдельно: вызывающий код добавляет
+    // его в scene НАПРЯМУЮ и позиционирует независимо от вращения тела врага.
     const healthBar = create3DHealthBar(type);
-    healthBar.position.y = (type === 'boss') ? (isFlyingBoss ? 2.0 : 2.2) : (type === 'flyer' ? 1.0 : 1.1);
-    group.add(healthBar); group.userData.healthBar = healthBar;
-    return { mesh: group, animator: animator };
+    const healthBarOffsetY = (type === 'boss') ? (isFlyingBoss ? 2.0 : 2.2) : (type === 'flyer' ? 1.0 : 1.1);
+    return { mesh: group, animator: animator, healthBar: healthBar, healthBarOffsetY: healthBarOffsetY };
 }
 
 function buildPickupMesh(type) {
@@ -1367,6 +1450,13 @@ function buildPickupMesh(type) {
         coin.rotation.x = Math.PI / 2; group.add(coin);
         const coinRim = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.02, 6, 12), new THREE.MeshBasicMaterial({ color: 0xfff2a0 }));
         group.add(coinRim);
+    } else if (type === 'gauss') {
+        // ГАУСС-ВИНТОВКА: узнаваемый дроп с боссов — тёмный корпус с пульсирующим голубым ядром
+        group.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.32), new THREE.MeshLambertMaterial({ color: 0x14161a })));
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 10), new THREE.MeshBasicMaterial({ color: 0x22e5ff }));
+        group.add(core); group.userData.pulseCore = core;
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.015, 6, 16), new THREE.MeshBasicMaterial({ color: 0x99f5ff }));
+        ring.rotation.x = Math.PI / 2; group.add(ring);
     } else {
         group.add(new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.18, 0.2), new THREE.MeshLambertMaterial({ color: 0x8b5a2b })));
         const bullets = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 0.22), new THREE.MeshBasicMaterial({ color: 0xffd700 }));
@@ -1393,23 +1483,43 @@ function syncEntitiesWith3DScene() {
         let entityData = entityMeshes.get(enemy._meshId);
         if (!entityData) {
             const compiled = buildEnemyMesh(enemy.type, enemy.isFlying); scene.add(compiled.mesh);
-            entityData = { mesh: compiled.mesh, animator: compiled.animator }; entityMeshes.set(enemy._meshId, entityData);
+            scene.add(compiled.healthBar); // независимый объект сцены, а не child враждебной модели
+            compiled.mesh.userData.gaussEnemyId = enemy._meshId; // метка для пробивающего луча Гаусс-винтовки (см. resolveEnemyIdFromObject)
+            entityData = { mesh: compiled.mesh, animator: compiled.animator, healthBar: compiled.healthBar, healthBarOffsetY: compiled.healthBarOffsetY };
+            entityMeshes.set(enemy._meshId, entityData);
         }
         entityData.mesh.position.set(enemy.x, enemy.z || 0.0, enemy.y);
         entityData.mesh.rotation.y = Math.atan2(playerX - enemy.x, playerY - enemy.y);
-        if (entityData.mesh.userData.healthBar) {
-            const healthBar = entityData.mesh.userData.healthBar; const fg = healthBar.userData.fg;
+        if (entityData.healthBar) {
+            const healthBar = entityData.healthBar; const fg = healthBar.userData.fg;
             fg.scale.x = Math.max(0, Math.min(1, enemy.health / enemy.maxHealth));
+            // Мировая позиция берётся напрямую от врага (не от вращающегося родителя)
+            healthBar.position.set(enemy.x, (enemy.z || 0.0) + entityData.healthBarOffsetY, enemy.y);
+            // Мгновенное выравнивание по камере копированием кватерниона (эквивалент lookAt, но без
+            // пересчёта тригонометрии); дополнительный принудительный lookAt — в render3D() ниже.
             healthBar.quaternion.copy(camera.quaternion);
         }
         if (entityData.animator) entityData.animator(time);
 
-        // ВИЗУАЛ СПОСОБНОСТЕЙ БОССА: синий лазер по линии огня и красное кольцо-предупреждение земляного взрыва
+        // ВИЗУАЛ СПОСОБНОСТЕЙ БОССА: синий лазер (наземный "Ворден" + постоянный луч летающего
+        // босса, у которого раньше НЕ было визуала вообще — отсюда "невидимый лазер"), красная
+        // линия-телеграф ПЕРЕД лазером (1 сек предупреждения) и красное кольцо-предупреждение
+        // земляного взрыва.
         if (enemy.type === 'boss') {
-            if (!entityData.laserLine) {
-                const laserGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
-                const laserMat = new THREE.LineBasicMaterial({ color: 0x2299ff, linewidth: 3, transparent: true, opacity: 0.85 });
-                entityData.laserLine = new THREE.Line(laserGeo, laserMat); entityData.laserLine.visible = false; scene.add(entityData.laserLine);
+            if (!entityData.laserBeam) {
+                // ТОНКИЙ MESH вместо THREE.Line: linewidth у LineBasicMaterial игнорируется
+                // почти всеми WebGL-бэкендами (всегда ~1px), из-за чего луч был практически не
+                // виден. Цилиндр + яркий emissive-материал дают настоящую толщину и свечение.
+                const laserGeo = new THREE.CylinderGeometry(0.045, 0.045, 1, 8, 1, true);
+                const laserMat = new THREE.MeshStandardMaterial({
+                    color: 0x00BFFF, emissive: 0x00BFFF, emissiveIntensity: 3.0,
+                    transparent: true, opacity: 0.85, side: THREE.DoubleSide,
+                    depthTest: false, depthWrite: false // не даём стенам/геометрии перекрывать луч
+                });
+                entityData.laserBeam = new THREE.Mesh(laserGeo, laserMat);
+                entityData.laserBeam.visible = false;
+                entityData.laserBeam.renderOrder = 999; // рендерим ПОВЕРХ стен, даже если они физически ближе к камере
+                scene.add(entityData.laserBeam);
             }
             if (!entityData.warnRing) {
                 const ringGeo = new THREE.RingGeometry(2.9, 3.2, 24);
@@ -1417,10 +1527,47 @@ function syncEntitiesWith3DScene() {
                 entityData.warnRing = new THREE.Mesh(ringGeo, ringMat);
                 entityData.warnRing.rotation.x = -Math.PI / 2; entityData.warnRing.visible = false; scene.add(entityData.warnRing);
             }
-            entityData.laserLine.visible = (enemy.abilityState === 'laser');
-            if (entityData.laserLine.visible) {
-                const points = [new THREE.Vector3(enemy.x, 1.2, enemy.y), new THREE.Vector3(playerX, 0.75 + playerZ, playerY)];
-                entityData.laserLine.geometry.setFromPoints(points);
+            if (!entityData.laserWarnLine) {
+                // ТЕЛЕГРАФ ЛАЗЕРА: тонкая, полупрозрачная КРАСНАЯ линия НА ЗЕМЛЕ вдоль будущей
+                // траектории лазера, показывается ровно 1 секунду перед активацией самого луча.
+                const warnLineMat = new THREE.LineBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.55 });
+                entityData.laserWarnLine = new THREE.Line(new THREE.BufferGeometry(), warnLineMat);
+                entityData.laserWarnLine.visible = false;
+                entityData.laserWarnLine.renderOrder = 999;
+                scene.add(entityData.laserWarnLine);
+            }
+
+            // Наземный босс: телеграф активен в 'laserWarn' (1 сек), сам луч — только в 'laser'.
+            // Летающий босс: постоянный луч сверху, пока игрок в радиусе действия (см. update()).
+            const groundLaserActive = (!enemy.isFlying && enemy.abilityState === 'laser');
+            const groundLaserWarnActive = (!enemy.isFlying && enemy.abilityState === 'laserWarn');
+            const flyingBeamActive = (enemy.isFlying && Math.hypot(playerX - enemy.x, playerY - enemy.y) < 5.0);
+            entityData.laserBeam.visible = groundLaserActive || flyingBeamActive;
+            entityData.laserWarnLine.visible = groundLaserWarnActive;
+
+            if (entityData.laserWarnLine.visible) {
+                // Линия телеграфа лежит НА ЗЕМЛЕ (небольшая высота над полом) и, как и сам луч,
+                // пересчитывается каждый кадр от текущей позиции босса к текущей позиции игрока —
+                // это честно показывает, куда прилетит урон, если игрок останется на месте.
+                const groundFrom = new THREE.Vector3(enemy.x, 0.06, enemy.y);
+                const groundTo = new THREE.Vector3(playerX, 0.06, playerY);
+                entityData.laserWarnLine.geometry.dispose();
+                entityData.laserWarnLine.geometry = new THREE.BufferGeometry().setFromPoints([groundFrom, groundTo]);
+            }
+
+            if (entityData.laserBeam.visible) {
+                // КАЖДЫЙ КАДР пересчитываем луч заново от текущей позиции босса (source) к текущей
+                // позиции игрока (target) — а не один раз при создании.
+                const from = new THREE.Vector3(enemy.x, enemy.isFlying ? (enemy.z || 0.9) + 0.3 : 1.2, enemy.y);
+                const to = new THREE.Vector3(playerX, 0.75 + playerZ, playerY);
+                const dir = new THREE.Vector3().subVectors(to, from);
+                const dist = dir.length();
+                if (dist > 0.001) {
+                    const mid = from.clone().addScaledVector(dir, 0.5);
+                    entityData.laserBeam.position.copy(mid);
+                    entityData.laserBeam.scale.set(1, dist, 1); // цилиндр растянут вдоль своей оси Y на всю дистанцию
+                    entityData.laserBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+                }
             }
             entityData.warnRing.visible = (enemy.abilityState === 'warn');
             if (entityData.warnRing.visible) { entityData.warnRing.position.set(enemy.warnX, 0.05, enemy.warnY); }
@@ -1474,8 +1621,10 @@ function syncEntitiesWith3DScene() {
     for (let [id, val] of entityMeshes.entries()) {
         if (!activeMeshIds.has(id)) {
             scene.remove(val.mesh ? val.mesh : val);
-            if (val.laserLine) scene.remove(val.laserLine);
+            if (val.healthBar) scene.remove(val.healthBar);
+            if (val.laserBeam) scene.remove(val.laserBeam);
             if (val.warnRing) scene.remove(val.warnRing);
+            if (val.laserWarnLine) scene.remove(val.laserWarnLine);
             entityMeshes.delete(id);
         }
     }
@@ -1495,7 +1644,7 @@ function connectMultiplayer(serverUrl, roomCode, playerName, chosenDifficulty, o
             multiplayer.players = {}; let me = null;
             msg.players.forEach(p => { multiplayer.players[p.id] = p; if (p.id === multiplayer.myId) me = p; });
             const bossEntry = msg.enemies.find(e => e.type === 'boss');
-            if (bossEntry) { hasBoss = true; bossUi.style.display = 'block'; bossHpUi.innerText = Math.max(0, Math.floor(bossEntry.hp)); } else { hasBoss = false; bossUi.style.display = 'none'; }
+            if (bossEntry) { hasBoss = true; bossUi.style.display = 'block'; bossHpUi.innerText = Math.max(0, Math.floor(bossEntry.hp)); bossHpMaxUi.innerText = Math.floor(bossEntry.maxHp); } else { hasBoss = false; bossUi.style.display = 'none'; }
             if (me) {
                 health = Math.max(0, Math.floor(me.health)); healthUi.innerText = health; score = me.score; scoreUi.innerText = score;
                 if (!me.alive && gameState === 'PLAYING') {
@@ -1643,7 +1792,7 @@ function spawnEnemy(isBoss = false) {
             if (isBoss) {
                 const bossHp = bossHpValue;
                 enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: 'boss', health: bossHp, maxHealth: bossHp, speed: 2.1, size: 1.3, isFlying: settings.flyingBoss, hoverPhase: Math.random() * Math.PI * 2 });
-                hasBoss = true; bossUi.style.display = "block"; bossHpUi.innerText = bossHp;
+                hasBoss = true; bossUi.style.display = "block"; bossHpUi.innerText = bossHp; bossHpMaxUi.innerText = bossHp;
             } else {
                 let type;
                 if (settings.flyingEnemies) { const r = Math.random(); type = r < 0.34 ? 'creeper' : (r < 0.67 ? 'skeleton' : 'flyer'); } else { type = Math.random() > 0.5 ? 'creeper' : 'skeleton'; }
@@ -1703,7 +1852,8 @@ function attemptMultiplayerConnect() {
             statusEl.innerText = ''; playerX = spawnX; playerY = spawnY; playerAngle = 0.0; playerPitch = 0.0;
             playerZ = 0; playerVelZ = 0; isOnGround = true; health = 100; maxHealth = 100; score = 0; ammo = 100;
             maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; shotgunClip = 2; rifleClip = 30; minigunClip = 100;
-            currentWeapon = 'shotgun'; rocketLoaded = true; weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false };
+            currentWeapon = 'shotgun'; rocketLoaded = true; weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
+            gaussCharges = 0; gaussFireTimer = 0;
             grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = []; meleeCooldownTimer = 0;
             enemies = []; projectiles = []; particles = []; pickups = [];
             healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)";
@@ -1758,7 +1908,8 @@ function restartGame() {
     maxShotgunClip = 2; maxRifleClip = 30; maxMinigunClip = 100; maxPistolClip = 12; maxSniperClip = 5; maxFlamethrowerFuel = 100;
     shotgunClip = 2; rifleClip = 30; minigunClip = 100; pistolClip = 12; sniperClip = 5; flamethrowerFuel = 100;
     currentWeapon = 'shotgun'; rocketLoaded = true; hasBoss = false; isReloading = false; reloadTimer = 0; meleeCooldownTimer = 0; pistolFireRateTimer = 0; flamethrowerTickTimer = 0; hardBossKillCount = 0;
-    weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false };
+    weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
+    gaussCharges = 0; gaussFireTimer = 0;
     shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600 };
     meleeTier = 0; chainsawCharge = maxChainsawCharge; isChainsawActive = false; chainsawTickTimer = 0;
     grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
@@ -1812,6 +1963,11 @@ window.addEventListener('keydown', e => {
         if (weaponsUnlocked.flamethrower) {
             currentWeapon = 'flamethrower'; weaponUi.innerText = `ОГНЕМЁТ [7] (${Math.ceil(flamethrowerFuel)}/${maxFlamethrowerFuel})`; reloadUi.innerText = isReloading ? "(ЗАПРАВКА...)" : ""; updateWeaponVisibility();
         } else { showCenterMessage("ЗАБЛОКИРОВАНО! Купите Огнемёт в магазине (E)"); }
+    }
+    if (e.code === 'Digit8') {
+        if (weaponsUnlocked.gauss) {
+            currentWeapon = 'gauss'; weaponUi.innerText = `ГАУСС-ВИНТОВКА [8] (${gaussCharges} ЗАРЯДОВ)`; reloadUi.innerText = ""; updateWeaponVisibility();
+        } else { showCenterMessage("ЗАБЛОКИРОВАНО! Гаусс-винтовка выпадает только с боссов."); }
     }
     if (e.code === 'KeyM') {
         currentWeapon = 'melee';
@@ -2030,8 +2186,128 @@ function executeShot(dt) {
             weaponUi.innerText = `ОГНЕМЁТ [7] (${Math.ceil(flamethrowerFuel)}/${maxFlamethrowerFuel})`;
             if (flamethrowerFuel <= 0) showCenterMessage("ТОПЛИВО ЗАКОНЧИЛОСЬ! Нажмите R");
         }
+    } else if (currentWeapon === 'gauss') {
+        // ГАУСС-ВИНТОВКА: пробивающий луч (см. fireGaussRifle) с фиксированной задержкой между выстрелами
+        if (gaussFireTimer <= 0) {
+            if (gaussCharges > 0) {
+                fireGaussRifle();
+            } else {
+                showCenterMessage("НЕТ ЗАРЯДОВ ГАУСС-ВИНТОВКИ! Найдите ещё у боссов.");
+            }
+        }
     }
 }
+
+// ==========================================================================
+// ГАУСС-ВИНТОВКА — ПРОБИВАЮЩИЙ ЛУЧ (THREE.Raycaster.intersectObjects)
+// ==========================================================================
+// В отличие от checkHit() (которая находит одну ближайшую цель по углу обзора),
+// Гаусс-винтовка стреляет НАСТОЯЩИМ 3D-лучом из камеры и пробивает ВСЕХ врагов
+// на своём пути через raycaster.intersectObjects(), нанося полный урон каждому.
+// Луч останавливается на ближайшей стене (если она есть перед пробиваемыми целями).
+const gaussRaycaster = new THREE.Raycaster();
+const GAUSS_MAX_RANGE = 60;
+
+// Возвращает список мешей врагов (корневые Group-объекты) для проверки лучом.
+// Каждый корневой mesh помечен userData.gaussEnemyId в syncEntitiesWith3DScene().
+function getEnemyMeshesForRaycast() {
+    const list = [];
+    enemies.forEach(enemy => {
+        const entityData = entityMeshes.get(enemy._meshId);
+        if (entityData && entityData.mesh) list.push(entityData.mesh);
+    });
+    return list;
+}
+
+// Луч intersectObjects() бьёт по дочерним мешам (руки/тело/т.д.), поэтому поднимаемся
+// по цепочке .parent, пока не найдём объект с меткой gaussEnemyId (корень врага).
+function resolveEnemyIdFromObject(obj) {
+    let o = obj;
+    while (o) {
+        if (o.userData && o.userData.gaussEnemyId) return o.userData.gaussEnemyId;
+        o = o.parent;
+    }
+    return null;
+}
+
+function fireGaussRifle() {
+    if (!camera || !scene) return;
+    gaussFireTimer = GAUSS_FIRE_DELAY;
+    gaussCharges = Math.max(0, gaussCharges - 1);
+    isShooting = true; shootTimer = 0;
+    weaponUi.innerText = `ГАУСС-ВИНТОВКА [8] (${gaussCharges} ЗАРЯДОВ)`;
+    playRocketLaunchSound(); triggerMuzzleFlash();
+
+    const origin = camera.position.clone();
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    gaussRaycaster.set(origin, dir);
+    gaussRaycaster.far = GAUSS_MAX_RANGE;
+
+    // Сначала находим ближайшую стену на пути луча — она ограничивает дальность пробития
+    let wallDist = GAUSS_MAX_RANGE;
+    if (wallMeshes.length) {
+        const wallHits = gaussRaycaster.intersectObjects(wallMeshes, false);
+        if (wallHits.length) wallDist = wallHits[0].distance;
+    }
+
+    // ПРОБИВАЮЩИЙ УРОН: raycaster.intersectObjects находит ВСЕ пересечения по пути луча,
+    // не только первое — так луч проходит "сквозь" каждого врага и наносит урон всем разом.
+    const enemyMeshes = getEnemyMeshesForRaycast();
+    const hits = enemyMeshes.length ? gaussRaycaster.intersectObjects(enemyMeshes, true) : [];
+
+    const alreadyHit = new Set();
+    let farthestHitDist = 0;
+    for (const hit of hits) {
+        if (hit.distance > wallDist) continue; // стена блокирует всё, что дальше неё
+        const enemyId = resolveEnemyIdFromObject(hit.object);
+        if (!enemyId || alreadyHit.has(enemyId)) continue;
+        alreadyHit.add(enemyId);
+        const target = enemies.find(e => e._meshId === enemyId);
+        if (!target) continue;
+        const dmg = BASE_GAUSS_DAMAGE * damageMultiplier;
+        target.health -= dmg;
+        spawnBlood(target.x, target.y, dmg / 4);
+        if (target.type === 'boss') bossHpUi.innerText = Math.max(0, Math.floor(target.health));
+        if (multiplayer.enabled && target.id) sendNetworkHit(target.id, dmg);
+        farthestHitDist = Math.max(farthestHitDist, hit.distance);
+    }
+
+    const beamLength = alreadyHit.size > 0 ? Math.min(wallDist, farthestHitDist + 1.0) : wallDist;
+    spawnGaussBeam(origin, dir, beamLength);
+}
+
+// ВИЗУАЛ: голубой электрический луч (ломаная линия со случайным дрожанием "разрядов")
+function spawnGaussBeam(origin, dir, length) {
+    if (!scene) return;
+    const muzzlePoint = origin.clone().addScaledVector(dir, 0.35).add(new THREE.Vector3(0, -0.05, 0));
+    const endPoint = origin.clone().addScaledVector(dir, length);
+    const segmentCount = 7;
+    const points = [];
+    for (let i = 0; i <= segmentCount; i++) {
+        const t = i / segmentCount;
+        const p = muzzlePoint.clone().lerp(endPoint, t);
+        if (i > 0 && i < segmentCount) {
+            // случайное дрожание перпендикулярно лучу — создаёт вид электрического разряда
+            const jitter = (Math.random() - 0.5) * 0.06;
+            const jitter2 = (Math.random() - 0.5) * 0.06;
+            const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize();
+            const up = new THREE.Vector3().crossVectors(right, dir).normalize();
+            p.addScaledVector(right, jitter).addScaledVector(up, jitter2);
+        }
+        points.push(p);
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({ color: 0x22e5ff, transparent: true, opacity: 1.0 });
+    const line = new THREE.Line(geo, mat);
+    scene.add(line);
+    // Второй, более толстый и тусклый слой для эффекта свечения луча
+    const glowMat = new THREE.LineBasicMaterial({ color: 0x99f5ff, transparent: true, opacity: 0.4 });
+    const glowLine = new THREE.Line(geo.clone(), glowMat);
+    scene.add(glowLine);
+    tracers.push({ mesh: line, life: GAUSS_BEAM_LIFETIME, extraMesh: glowLine });
+}
+const GAUSS_BEAM_LIFETIME = 0.16;
 
 // КОНУСНЫЙ УРОН (для Огнемёта): наносит урон всем врагам в радиусе и в пределах угла обзора конуса
 function applyConeDamage(range, halfAngle, dmgPerSecond, dt) {
@@ -2139,6 +2415,81 @@ function checkHit(fovSpread, damage, maxRange, useTracer) {
     if (useTracer) spawnTracer(hitTarget ? minEnemyDist : (maxRange !== Infinity ? maxRange : 25));
 }
 
+// ==========================================================================
+// SPATIAL HASH ДЛЯ ВРАГОВ — оптимизация коллизий снарядов.
+// ==========================================================================
+// Раньше каждый снаряд каждый кадр проверял расстояние до ВСЕХ врагов
+// (O(снаряды * враги)). Вместо этого один раз за кадр раскладываем врагов
+// по ячейкам сетки (bucket'ы), а снаряд затем проверяет только врагов из
+// своей ячейки и 8 соседних — этого достаточно, т.к. радиус попадания (0.45)
+// меньше размера ячейки. Сложность падает до O(снаряды + враги) за кадр.
+const SPATIAL_HASH_CELL_SIZE = 1.0; // размер ячейки в игровых единицах
+function spatialHashKey(cellX, cellY) { return cellX + ',' + cellY; }
+
+function buildEnemySpatialHash() {
+    const hash = new Map();
+    for (const enemy of enemies) {
+        const cellX = Math.floor(enemy.x / SPATIAL_HASH_CELL_SIZE);
+        const cellY = Math.floor(enemy.y / SPATIAL_HASH_CELL_SIZE);
+        const key = spatialHashKey(cellX, cellY);
+        let bucket = hash.get(key);
+        if (!bucket) { bucket = []; hash.set(key, bucket); }
+        bucket.push(enemy);
+    }
+    return hash;
+}
+
+// Возвращает врагов из ячейки (x,y) и всех 8 соседних ячеек (3x3 область) —
+// достаточно, чтобы не пропустить врага рядом с границей ячейки.
+function getNearbyEnemies(hash, x, y) {
+    const cellX = Math.floor(x / SPATIAL_HASH_CELL_SIZE);
+    const cellY = Math.floor(y / SPATIAL_HASH_CELL_SIZE);
+    const nearby = [];
+    for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+            const bucket = hash.get(spatialHashKey(cellX + dx, cellY + dy));
+            if (bucket) { for (const e of bucket) nearby.push(e); }
+        }
+    }
+    return nearby;
+}
+
+// ==========================================================================
+// СКРЫТНОСТЬ В КУСТАХ (Raycaster) — ПЕР-ВРАЖЕСКАЯ проверка линии видимости
+// ==========================================================================
+// Раньше `isPlayerHidden` было глобальным флагом: стоит игрок в кусте — он
+// невидим СРАЗУ для всех врагов, независимо от стен и дистанции. Теперь
+// сокрытие индивидуально для каждого врага: игрок остаётся в кусте (это
+// по-прежнему обязательное условие), но реально невидим для конкретного
+// врага, только если между ними физически есть стена — это проверяется
+// настоящим 3D-рейкастом (THREE.Raycaster) по мешам стен (wallMeshes), а не
+// по сеточной эвристике. Враг в прямой видимости через кусты по-прежнему
+// заметит игрока, даже если тот формально "в кусте".
+const stealthRaycaster = new THREE.Raycaster();
+
+// Есть ли физическая стена на прямой между двумя точками карты (на средней
+// высоте стен, y=1.0 — стены имеют высоту 2 и стоят от пола до потолка).
+function isWallBetween(x1, y1, x2, y2) {
+    if (!wallMeshes.length) return false;
+    const from = new THREE.Vector3(x1, 1.0, y1);
+    const to = new THREE.Vector3(x2, 1.0, y2);
+    const offset = new THREE.Vector3().subVectors(to, from);
+    const dist = offset.length();
+    if (dist < 0.001) return false;
+    stealthRaycaster.set(from, offset.normalize());
+    stealthRaycaster.near = 0;
+    stealthRaycaster.far = dist;
+    return stealthRaycaster.intersectObjects(wallMeshes, false).length > 0;
+}
+
+// Скрыт ли игрок от КОНКРЕТНОГО врага прямо сейчас: должен стоять в кусте
+// (isPlayerHidden) И между ним и этим врагом должна быть стена по рейкасту.
+// Даже находясь в кусте, враг с чистой линией видимости всё ещё видит игрока.
+function isPlayerHiddenFromEnemy(enemy) {
+    if (!isPlayerHidden) return false;
+    return isWallBetween(enemy.x, enemy.y, playerX, playerY);
+}
+
 function update(dt) {
     if (gameState !== 'PLAYING') return;
     if (health <= 0) {
@@ -2162,8 +2513,14 @@ function update(dt) {
     // ЗАТУХАНИЕ ТРАССЕРОВ ПУЛЬ
     tracers = tracers.filter(t => {
         t.life -= dt;
-        if (t.life <= 0) { scene.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh.material.dispose(); return false; }
-        t.mesh.material.opacity = Math.max(0, t.life / TRACER_LIFETIME) * 0.9;
+        const lifetime = t.extraMesh ? GAUSS_BEAM_LIFETIME : TRACER_LIFETIME;
+        if (t.life <= 0) {
+            scene.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh.material.dispose();
+            if (t.extraMesh) { scene.remove(t.extraMesh); t.extraMesh.geometry.dispose(); t.extraMesh.material.dispose(); }
+            return false;
+        }
+        t.mesh.material.opacity = Math.max(0, t.life / lifetime) * (t.extraMesh ? 1.0 : 0.9);
+        if (t.extraMesh) t.extraMesh.material.opacity = Math.max(0, t.life / lifetime) * 0.4;
         return true;
     });
 
@@ -2199,6 +2556,7 @@ function update(dt) {
     if (minigunFireRateTimer > 0) minigunFireRateTimer -= dt;
     if (pistolFireRateTimer > 0) pistolFireRateTimer -= dt;
     if (meleeCooldownTimer > 0) meleeCooldownTimer -= dt;
+    if (gaussFireTimer > 0) gaussFireTimer -= dt;
     if (isShooting) { shootTimer += dt * 16; if (shootTimer > 4) isShooting = false; }
     walkCycle += isMoving ? dt * 11 : 0;
 
@@ -2247,13 +2605,19 @@ function update(dt) {
         }
     }
 
+    // Строим spatial hash врагов ОДИН РАЗ за кадр, а не на каждый снаряд —
+    // см. buildEnemySpatialHash() / getNearbyEnemies() выше.
+    const enemySpatialHash = buildEnemySpatialHash();
     projectiles = projectiles.filter(p => {
         p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
         let cx = Math.floor(p.x); let cy = Math.floor(p.y);
         if (cx < 0 || cx >= mapSize || cy < 0 || cy >= mapSize || map[cy * mapSize + cx] > 0) {
             spawnExplosion(p.x, p.y, p.z); explodeInRadius(p.x, p.y, p.damage); return false;
         }
-        for (let enemy of enemies) {
+        // Раньше: `for (let enemy of enemies)` — проверка ВСЕХ врагов на каждый снаряд.
+        // Теперь: только враги из ближайших ячеек spatial hash вокруг снаряда.
+        const nearbyEnemies = getNearbyEnemies(enemySpatialHash, p.x, p.y);
+        for (let enemy of nearbyEnemies) {
             if (Math.hypot(enemy.x - p.x, enemy.y - p.y) < 0.45) {
                 spawnExplosion(p.x, p.y, p.z); explodeInRadius(p.x, p.y, p.damage); return false;
             }
@@ -2282,8 +2646,10 @@ function update(dt) {
 
     // ПРОВЕРКА ЛИНИИ ОГНЯ ОТ ВРАГА К ИГРОКУ (для скелетов-стрелков)
     function enemyHasLineOfSight(enemy) {
-        // СИСТЕМА СКРЫТНОСТИ: игрок в кусте невидим для врагов, даже если геометрически видим
-        if (isPlayerHidden) return false;
+        // СИСТЕМА СКРЫТНОСТИ: игрок в кусте невидим ТОЛЬКО для врагов, которых от него
+        // физически отделяет стена (см. isPlayerHiddenFromEnemy / Raycaster выше) —
+        // враг с чистой линией видимости всё равно засечёт игрока даже в кусте.
+        if (isPlayerHiddenFromEnemy(enemy)) return false;
         const dx = playerX - enemy.x; const dy = playerY - enemy.y; const dist = Math.hypot(dx, dy);
         const steps = Math.max(6, Math.floor(dist / 0.25)); const stepX = dx / steps; const stepY = dy / steps;
         let cx = enemy.x; let cy = enemy.y;
@@ -2361,6 +2727,13 @@ function update(dt) {
             playPickupSound();
             if (p.type === 'health') { health = Math.min(maxHealth, health + 25); healthUi.innerText = health; }
             else if (p.type === 'coin') { score += COIN_VALUE; scoreUi.innerText = score; }
+            else if (p.type === 'gauss') {
+                const firstTime = !weaponsUnlocked.gauss;
+                weaponsUnlocked.gauss = true; gaussCharges += GAUSS_CHARGES_PER_DROP;
+                showCenterMessage(firstTime ? "НАЙДЕНА ГАУСС-ВИНТОВКА! [8]" : `+${GAUSS_CHARGES_PER_DROP} ЗАРЯДОВ ГАУСС-ВИНТОВКИ`);
+                if (currentWeapon === 'gauss') weaponUi.innerText = `ГАУСС-ВИНТОВКА [8] (${gaussCharges} ЗАРЯДОВ)`;
+                updateInventoryUI();
+            }
             else { ammo = Math.min(200, ammo + 35); ammoUi.innerText = ammo; }
             return false;
         }
@@ -2397,6 +2770,8 @@ function update(dt) {
                 if (enemy.type === 'boss') {
                     score += 2500; hasBoss = false; bossUi.style.display = "none";
                     if (difficulty === 'HARD') hardBossKillCount++; // ДИНАМИЧЕСКОЕ МАСШТАБИРОВАНИЕ ЗДОРОВЬЯ
+                    // ГАУСС-ВИНТОВКА: гарантированный дроп ТОЛЬКО с боссов (недоступна в магазине)
+                    pickups.push({ x: enemy.x + 0.3, y: enemy.y + 0.3, type: 'gauss', bounceTimer: Math.random() * 10 });
                 }
                 else { score += enemy.type === 'creeper' ? 100 : 150; }
                 scoreUi.innerText = score; return false;
@@ -2464,9 +2839,14 @@ function update(dt) {
                 } else {
                     // ВОРДЕН: цикл способностей
                     if (enemy.abilityState === 'idle' && enemy.abilityTimer <= 0) {
-                        enemy.abilityState = Math.random() < 0.5 ? 'laser' : 'warn';
-                        if (enemy.abilityState === 'laser') { enemy.abilityDuration = 1.6; showCenterMessage("ВОРДЕН: СИНИЙ ЛАЗЕР!"); }
+                        enemy.abilityState = Math.random() < 0.5 ? 'laserWarn' : 'warn';
+                        if (enemy.abilityState === 'laserWarn') { enemy.abilityDuration = 1.0; showCenterMessage("ВОРДЕН: ЦЕЛИТСЯ ЛАЗЕРОМ..."); }
                         else { enemy.abilityDuration = 1.2; enemy.warnX = playerX; enemy.warnY = playerY; showCenterMessage("ВОРДЕН: ЗЕМЛЯНОЙ ВЗРЫВ!"); }
+                    } else if (enemy.abilityState === 'laserWarn') {
+                        // ТЕЛЕГРАФ: 1 секунда красной линии на земле, урон ещё НЕ наносится —
+                        // сам лазер активируется и начинает бить только после этой паузы.
+                        enemy.abilityDuration -= dt;
+                        if (enemy.abilityDuration <= 0) { enemy.abilityState = 'laser'; enemy.abilityDuration = 1.6; showCenterMessage("ВОРДЕН: СИНИЙ ЛАЗЕР!"); }
                     } else if (enemy.abilityState === 'laser') {
                         enemy.abilityDuration -= dt;
                         if (enemyHasLineOfSight(enemy) && Math.hypot(playerX - enemy.x, playerY - enemy.y) < 16) {
@@ -2491,8 +2871,9 @@ function update(dt) {
             let dx = playerX - enemy.x; let dy = playerY - enemy.y; let dist = Math.hypot(dx, dy);
 
             // ФИКС ЗАСТРЕВАНИЯ В СТЕНАХ: коллизия с учетом радиуса врага + скольжение вдоль стен + рывок при полном застревании
-            // СКРЫТНОСТЬ: если игрок спрятан в кусте и не вплотную к врагу, враг теряет цель и перестаёт преследовать
-            if (dist < 22 && dist > 0.35 && !(isPlayerHidden && dist > 2.2)) {
+            // СКРЫТНОСТЬ: если враг физически не видит игрока через стену (Raycaster) пока тот
+            // в кусте, и не вплотную к нему, враг теряет цель и перестаёт преследовать
+            if (dist < 22 && dist > 0.35 && !(isPlayerHiddenFromEnemy(enemy) && dist > 2.2)) {
                 const radius = Math.min(enemy.size * 0.42, 0.42);
                 let stepX = (dx / dist) * enemy.speed * dt;
                 let stepY = (dy / dist) * enemy.speed * dt;
@@ -2574,7 +2955,7 @@ function renderMinimap() {
     }
     pickups.forEach(p => {
         let px = (p.x / mapSize) * minimapCanvas.width; let py = (p.y / mapSize) * minimapCanvas.height;
-        mctx.fillStyle = p.type === 'health' ? '#00ff66' : (p.type === 'coin' ? '#ffd700' : '#ffff00'); mctx.fillRect(px - 2, py - 2, 4, 4);
+        mctx.fillStyle = p.type === 'health' ? '#00ff66' : (p.type === 'coin' ? '#ffd700' : (p.type === 'gauss' ? '#22e5ff' : '#ffff00')); mctx.fillRect(px - 2, py - 2, 4, 4);
     });
     enemies.forEach(enemy => {
         let mmX = (enemy.x / mapSize) * minimapCanvas.width; let mmY = (enemy.y / mapSize) * minimapCanvas.height;
@@ -2615,7 +2996,15 @@ function render3D() {
         weaponMeshes.chainsawChain.rotation.z += isChainsawActive ? 1.4 : 0.15;
     }
     weaponPivot.position.set(swayX, (isReloading ? -0.3 : 0) + recoilY, recoilZ);
-    syncEntitiesWith3DScene(); renderer.render(scene, camera);
+    syncEntitiesWith3DScene();
+    // ПРИНУДИТЕЛЬНОЕ ВЫРАВНИВАНИЕ ПОЛОСОК ЗДОРОВЬЯ ПО КАМЕРЕ ПРЯМО ПЕРЕД РЕНДЕРОМ — второй,
+    // гарантирующий проход поверх quaternion.copy() внутри syncEntitiesWith3DScene(). Health bar
+    // сейчас независимый объект сцены (не child враждебной модели), так что lookAt даёт верный
+    // результат без влияния поворота тела врага.
+    entityMeshes.forEach(entityData => {
+        if (entityData && entityData.healthBar) entityData.healthBar.lookAt(camera.position);
+    });
+    renderer.render(scene, camera);
 }
 
 let lastTime = performance.now();
