@@ -20,13 +20,24 @@
             overflow: hidden; 
             user-select: none;
         }
+        /* Оборачивает контейнер игры + HUD + панель инвентаря одной группой,
+           чтобы при нехватке места по высоте/ширине окна (после увеличения
+           #game-container на 50%) вся группа могла быть пропорционально
+           уменьшена через transform: scale() в JS (см. applyResponsiveScale()),
+           а не обрезалась через body { overflow: hidden }. */
+        #game-scale-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform-origin: top center;
+        }
         #game-container {
             position: relative;
             box-shadow: 0 0 40px rgba(255, 0, 50, 0.5);
             border: 4px solid #331520;
             border-radius: 4px;
-            width: 800px;
-            height: 500px;
+            width: 1200px;
+            height: 750px;
         }
         #gameCanvas { 
             display: block;
@@ -38,14 +49,14 @@
             height: 150px !important;
         }
         #ui { 
-            margin-top: 10px; 
+            margin-top: 28px; 
             font-size: 14px; 
             text-shadow: 2px 2px black; 
             color: #ff3333; 
             font-weight: bold; 
             letter-spacing: 1px; 
             text-align: center; 
-            width: 800px; 
+            width: 1200px; 
             display: flex; 
             justify-content: space-between; 
             align-items: center;
@@ -76,7 +87,7 @@
             color: #ff0055; 
             font-size: 24px; 
             text-align: center; 
-            width: 800px; 
+            width: 1200px; 
             margin-bottom: 8px; 
             font-weight: bold; 
             display: none; 
@@ -289,6 +300,9 @@
            в JS через window.innerWidth/innerHeight (см. updateUIForScreenSize()).
            ====================================================================== */
         body.fullscreen-mode { overflow: hidden; }
+        #game-scale-wrapper.fullscreen-mode {
+            transform: none !important;
+        }
         #game-container.fullscreen-mode {
             position: fixed;
             top: 0; left: 0;
@@ -332,6 +346,7 @@
     <div id="gauss-charge-container"><div id="gauss-charge-fill"></div><div id="gauss-charge-mark-70"></div></div>
     <div id="gauss-charge-label"></div>
     
+    <div id="game-scale-wrapper">
     <div id="game-container">
         <div id="crosshair"></div>
         <div id="damage-container"></div>
@@ -494,9 +509,10 @@
     <div id="stealth-indicator" class="font-mono text-xs mt-1 px-3 py-1 rounded-full border-2 border-green-400 bg-green-900/70 text-green-200" style="display:none;">👁‍🗨 СКРЫТ В КУСТАХ — враги вас не видят</div>
 
     <!-- ПОСТОЯННАЯ ПАНЕЛЬ ИНВЕНТАРЯ ОРУЖИЯ (Tailwind CSS) -->
-    <div id="inventory-bar" class="w-[800px] mt-2 flex gap-1.5 bg-black/70 border-2 border-[#221122] rounded-md px-2 py-2 font-mono">
+    <div id="inventory-bar" class="w-[1200px] mt-2 flex gap-1.5 bg-black/70 border-2 border-[#221122] rounded-md px-2 py-2 font-mono">
         <!-- Слоты заполняются функцией updateInventoryUI() -->
     </div>
+    </div><!-- /#game-scale-wrapper -->
 
 <script>
 const canvas = document.getElementById("gameCanvas");
@@ -3945,7 +3961,12 @@ function gameLoop(currentTime) {
     update(dt); render3D(); renderMinimap(); requestAnimationFrame(gameLoop);
 }
 
-window.onload = function () { init3D(); updateInventoryUI(); requestAnimationFrame(gameLoop); }
+window.onload = function () {
+    init3D();
+    updateInventoryUI();
+    applyResponsiveScale();
+    requestAnimationFrame(gameLoop);
+}
 
 // ==========================================================================
 // ПОЛНОЭКРАННЫЙ РЕЖИМ (клавиша F)
@@ -3955,6 +3976,10 @@ window.onload = function () { init3D(); updateInventoryUI(); requestAnimationFra
 // 2) UI-элементы (счетчики, полоски здоровья и т.д.) пересчитывают позицию
 //    относительно window.innerWidth/innerHeight, оставаясь "приклеенными" к
 //    углам экрана — см. updateUIForScreenSize() ниже.
+// 3) Вне полноэкранного режима #game-scale-wrapper (контейнер + HUD + панель
+//    инвентаря) масштабируется целиком через applyResponsiveScale(), чтобы
+//    после увеличения #game-container на 50% (1200x750) панель #ui никогда
+//    не обрезалась и не перекрывалась на невысоких окнах браузера.
 function toggleFullscreen() {
     const container = document.getElementById('game-container');
     if (!document.fullscreenElement) {
@@ -3979,22 +4004,50 @@ function updateUIForScreenSize() {
         const vh = window.innerHeight;
         ui.style.left = '0px';
         ui.style.width = vw + 'px';
-        // Приклеиваем панель к нижнему краю экрана с небольшим отступом
-        ui.style.top = Math.max(0, vh - ui.offsetHeight - 8) + 'px';
+        // Приклеиваем панель к нижнему краю экрана с увеличенным отступом
+        // (было 8px — мало для более крупного HUD после увеличения контейнера)
+        ui.style.top = Math.max(0, vh - ui.offsetHeight - 24) + 'px';
     } else {
-        // Возврат к обычному потоковому расположению (см. базовые правила #ui в CSS)
+        // Возврат к обычному потоковому расположению (см. базовые правила #ui в CSS),
+        // масштаб группы (контейнер+UI+инвентарь) считает applyResponsiveScale(),
+        // которую вызывающий код (resize/fullscreenchange/onload) уже вызывает рядом
         ui.style.left = '';
         ui.style.width = '';
         ui.style.top = '';
     }
 }
 
+// Масштабирует #game-scale-wrapper (игровой контейнер 1200x750 + #ui + панель
+// инвентаря) целиком, если он не помещается по ширине/высоте окна, вместо
+// того чтобы позволить body { overflow: hidden } обрезать нижние элементы.
+// Не трогает разметку/пропорции внутри — это единый transform: scale(),
+// поэтому #ui остаётся под контейнером с тем же отступом, просто мельче.
+function applyResponsiveScale() {
+    const wrapper = document.getElementById('game-scale-wrapper');
+    if (!wrapper || document.fullscreenElement) return;
+
+    // Сначала сбрасываем масштаб, чтобы измерить "естественный" (100%) размер группы
+    wrapper.style.transform = 'none';
+    const naturalWidth = wrapper.offsetWidth;
+    const naturalHeight = wrapper.offsetHeight;
+    if (!naturalWidth || !naturalHeight) return;
+
+    // Оставляем небольшие поля, чтобы группа не упиралась в самый край окна
+    const availableWidth = window.innerWidth - 24;
+    const availableHeight = window.innerHeight - 24;
+
+    const scale = Math.min(1, availableWidth / naturalWidth, availableHeight / naturalHeight);
+    wrapper.style.transform = scale < 1 ? `scale(${scale})` : 'none';
+}
+
 document.addEventListener('fullscreenchange', () => {
     const container = document.getElementById('game-container');
     const canvas = document.getElementById('gameCanvas');
+    const wrapper = document.getElementById('game-scale-wrapper');
     const isFs = !!document.fullscreenElement;
 
     document.body.classList.toggle('fullscreen-mode', isFs);
+    wrapper.classList.toggle('fullscreen-mode', isFs);
     container.classList.toggle('fullscreen-mode', isFs);
     canvas.classList.toggle('fullscreen-mode', isFs);
     document.getElementById('ui').classList.toggle('fullscreen-mode', isFs);
@@ -4007,6 +4060,7 @@ document.addEventListener('fullscreenchange', () => {
             camera.updateProjectionMatrix();
             renderer.setSize(canvas.clientWidth, canvas.clientHeight);
         }
+        if (!isFs) applyResponsiveScale();
         updateUIForScreenSize();
     });
 });
@@ -4016,6 +4070,7 @@ window.addEventListener('resize', () => {
         camera.aspect = canvas.clientWidth / canvas.clientHeight; camera.updateProjectionMatrix();
         renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     }
+    applyResponsiveScale();
     updateUIForScreenSize();
 });
 </script>
