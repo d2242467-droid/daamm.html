@@ -15,7 +15,8 @@
             display: flex; 
             flex-direction: column; 
             align-items: center; 
-            justify-content: center; 
+            justify-content: flex-start; 
+            width: 100%;
             height: 100vh; 
             overflow: hidden; 
             user-select: none;
@@ -25,8 +26,12 @@
             box-shadow: 0 0 40px rgba(255, 0, 50, 0.5);
             border: 4px solid #331520;
             border-radius: 4px;
-            width: 800px;
-            height: 500px;
+            /* ОТЗЫВЧИВОСТЬ: контейнер игры теперь тянется по ширине экрана (до разумного
+               максимума) и держит пропорции 8:5 через aspect-ratio, а не фиксированные px. */
+            width: 100%;
+            max-width: 900px;
+            aspect-ratio: 8 / 5;
+            flex: 0 1 auto;
         }
         #gameCanvas { 
             display: block;
@@ -37,6 +42,12 @@
             width: 150px !important;
             height: 150px !important;
         }
+        /* ОТЗЫВЧИВЫЙ HUD-ПАНЕЛЬ: раньше это был центрированный блок фиксированной ширины
+           800px, который либо "плавал" узкой полоской на широких экранах, либо обрезался
+           / наезжал сам на себя на маленьких. Теперь панель растягивается на всю ширину
+           экрана (width: 100%, т.к. <body> уже занимает весь viewport) и использует CSS
+           Grid с auto-fit, чтобы пункты HUD сами перестраивались в нужное число колонок
+           и переносились на новую строку вместо наложения/обрезания на узких экранах. */
         #ui { 
             margin-top: 10px; 
             font-size: 14px; 
@@ -45,14 +56,22 @@
             font-weight: bold; 
             letter-spacing: 1px; 
             text-align: center; 
-            width: 800px; 
-            display: flex; 
-            justify-content: space-between; 
+            width: 100%; 
+            max-width: 1400px;
+            box-sizing: border-box;
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            justify-items: center;
             align-items: center;
+            gap: 8px 16px;
             background: rgba(10, 5, 15, 0.85);
             padding: 10px 20px;
             border-radius: 4px;
             border: 2px solid #221122;
+        }
+        #ui > div { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; white-space: nowrap; }
+        @media (max-width: 640px) {
+            #ui { font-size: 11px; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); padding: 8px 10px; gap: 6px 10px; }
         }
         /* СТАМИНА: горизонтальная полоска в HUD (расходуется спринтом Shift и щитом N) */
         #stamina-bar-container {
@@ -76,7 +95,9 @@
             color: #ff0055; 
             font-size: 24px; 
             text-align: center; 
-            width: 800px; 
+            width: 100%;
+            max-width: 900px;
+            box-sizing: border-box;
             margin-bottom: 8px; 
             font-weight: bold; 
             display: none; 
@@ -492,7 +513,7 @@
         <div>СТАМИНА: <span id="stamina-bar-container"><span id="stamina-bar-fill"></span></span></div>
         <div>ОРУЖИЕ: <span id="weapon-name" style="color: #fff;">ДРОБОВИК [1] (2/2)</span></div>
         <div>ПАТРОНЫ: <span id="ammo-val">100</span> <span id="reload-msg" style="color: yellow;"></span></div>
-        <div>ВТОРИЧНОЕ: <span id="secondary-weapon-val" style="color:#88ddff;">СТАРТОВЫЙ ПИСТОЛЕТ (12/12) [ПКМ]</span></div>
+        <div>ВТОРИЧНОЕ: <span id="secondary-weapon-icon" style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;background:#2f2f2f;border:1px solid #666;vertical-align:middle;"></span><span id="secondary-weapon-val" style="color:#88ddff;">СТАРТОВЫЙ ПИСТОЛЕТ (12/12) [ПКМ]</span></div>
         <div>ГРАНАТЫ: <span id="grenade-val" style="color:#ffaa55;">ГРАНАТА (0) [Q]</span></div>
         <div>АПТЕЧКИ: <span id="medkit-val" style="color:#66ff88;">АПТЕЧКА (0) [H]</span></div>
         <div>СЧЕТ: <span id="score-val">0</span></div>
@@ -505,7 +526,7 @@
     <div id="stealth-indicator" class="font-mono text-xs mt-1 px-3 py-1 rounded-full border-2 border-green-400 bg-green-900/70 text-green-200" style="display:none;">👁‍🗨 СКРЫТ В КУСТАХ — враги вас не видят</div>
 
     <!-- ПОСТОЯННАЯ ПАНЕЛЬ ИНВЕНТАРЯ ОРУЖИЯ (Tailwind CSS) -->
-    <div id="inventory-bar" class="w-[800px] mt-2 flex gap-1.5 bg-black/70 border-2 border-[#221122] rounded-md px-2 py-2 font-mono">
+    <div id="inventory-bar" class="w-full max-w-[1400px] box-border mt-2 grid grid-cols-[repeat(auto-fit,minmax(72px,1fr))] gap-1.5 bg-black/70 border-2 border-[#221122] rounded-md px-2 py-2 font-mono">
         <!-- Слоты заполняются функцией updateInventoryUI() -->
     </div>
 
@@ -1648,14 +1669,19 @@ function updateInventoryUI() {
         // и считается "активным" всегда — оно не конкурирует за слот с основным оружием.
         const unlocked = s.key === 'secondary' ? true : (weaponsUnlocked[s.key] !== undefined ? weaponsUnlocked[s.key] : true);
         const active = s.key === 'secondary' ? true : (currentWeapon === s.key);
-        const base = 'flex-1 flex flex-col items-center justify-center rounded px-1 py-1.5 border-2 text-[10px] leading-tight transition-colors duration-150';
+        const base = 'flex flex-col items-center justify-center rounded px-1 py-1.5 border-2 text-[10px] leading-tight transition-colors duration-150';
         const stateClasses = !unlocked
             ? 'border-gray-700 bg-gray-900/60 text-gray-600 grayscale'
             : active
                 ? 'border-red-500 bg-red-900/50 text-white shadow-[0_0_8px_rgba(255,0,50,0.6)]'
                 : 'border-gray-600 bg-black/40 text-gray-300';
         const extra = (s.key === 'melee' && meleeTier === 2) ? `<span class="text-[8px] ${chainsawCharge < 25 ? 'text-red-400' : 'text-orange-300'}">${Math.ceil(chainsawCharge)}%</span>` : '';
-        return `<div class="${base} ${stateClasses}"><span class="font-bold">[${s.code}]</span><span>${unlocked ? s.label : '???'}</span>${extra}</div>`;
+        // ИКОНКА-ЦВЕТ для слота вторичного оружия — показывает текущий экипированный уровень
+        // (Стартовый/Револьвер/Дезерт Игл) тем же цветом, что и его 3D-модель в руке.
+        const swatch = (s.key === 'secondary')
+            ? `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-bottom:1px;background:${getSecondaryTierColor()};border:1px solid #666;"></span>`
+            : '';
+        return `<div class="${base} ${stateClasses}"><span class="font-bold">[${s.code}]</span>${swatch}<span>${unlocked ? s.label : '???'}</span>${extra}</div>`;
     }).join('');
 }
 
@@ -3331,6 +3357,15 @@ function getSecondaryTierName() {
     if (equippedSecondaryTier === 'deagle') return 'ПУСТЫННЫЙ ОРЁЛ';
     return 'СТАРТОВЫЙ ПИСТОЛЕТ';
 }
+// ЦВЕТ ИКОНКИ ВТОРИЧНОГО ОРУЖИЯ В HUD/ИНВЕНТАРЕ: подобран так, чтобы совпадать с
+// материалами 3D-модели этого уровня в руке игрока (см. secStarterGroup/secRevolverGroup/
+// secDeagleGroup выше) — тёмная сталь у стартового пистолета, вороненая сталь+дерево у
+// револьвера, золотистый затвор у Дезерт Игл.
+function getSecondaryTierColor() {
+    if (equippedSecondaryTier === 'revolver') return '#8a7256';
+    if (equippedSecondaryTier === 'deagle') return '#c9a25a';
+    return '#2f2f2f';
+}
 function getSecondaryBaseDamage() {
     if (equippedSecondaryTier === 'revolver') return BASE_REVOLVER_DAMAGE;
     if (equippedSecondaryTier === 'deagle') return BASE_DEAGLE_DAMAGE;
@@ -3406,6 +3441,8 @@ function updateSecondaryWeaponUi() {
     if (!el) return;
     const reloadTxt = secondaryReloading ? " (ПЕРЕЗАРЯДКА...)" : "";
     el.innerText = `${getSecondaryTierName()} (${getSecondaryClip()}/${getSecondaryMaxClip()})${reloadTxt} [ПКМ]`;
+    const iconEl = document.getElementById("secondary-weapon-icon");
+    if (iconEl) iconEl.style.background = getSecondaryTierColor();
 }
 
 // ==========================================================================
