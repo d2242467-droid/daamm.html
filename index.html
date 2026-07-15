@@ -15,8 +15,7 @@
             display: flex; 
             flex-direction: column; 
             align-items: center; 
-            justify-content: flex-start; 
-            width: 100%;
+            justify-content: center; 
             height: 100vh; 
             overflow: hidden; 
             user-select: none;
@@ -26,12 +25,8 @@
             box-shadow: 0 0 40px rgba(255, 0, 50, 0.5);
             border: 4px solid #331520;
             border-radius: 4px;
-            /* ОТЗЫВЧИВОСТЬ: контейнер игры теперь тянется по ширине экрана (до разумного
-               максимума) и держит пропорции 8:5 через aspect-ratio, а не фиксированные px. */
-            width: 100%;
-            max-width: 900px;
-            aspect-ratio: 8 / 5;
-            flex: 0 1 auto;
+            width: 800px;
+            height: 500px;
         }
         #gameCanvas { 
             display: block;
@@ -42,12 +37,6 @@
             width: 150px !important;
             height: 150px !important;
         }
-        /* ОТЗЫВЧИВЫЙ HUD-ПАНЕЛЬ: раньше это был центрированный блок фиксированной ширины
-           800px, который либо "плавал" узкой полоской на широких экранах, либо обрезался
-           / наезжал сам на себя на маленьких. Теперь панель растягивается на всю ширину
-           экрана (width: 100%, т.к. <body> уже занимает весь viewport) и использует CSS
-           Grid с auto-fit, чтобы пункты HUD сами перестраивались в нужное число колонок
-           и переносились на новую строку вместо наложения/обрезания на узких экранах. */
         #ui { 
             margin-top: 10px; 
             font-size: 14px; 
@@ -56,22 +45,14 @@
             font-weight: bold; 
             letter-spacing: 1px; 
             text-align: center; 
-            width: 100%; 
-            max-width: 1400px;
-            box-sizing: border-box;
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            justify-items: center;
+            width: 800px; 
+            display: flex; 
+            justify-content: space-between; 
             align-items: center;
-            gap: 8px 16px;
             background: rgba(10, 5, 15, 0.85);
             padding: 10px 20px;
             border-radius: 4px;
             border: 2px solid #221122;
-        }
-        #ui > div { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; white-space: nowrap; }
-        @media (max-width: 640px) {
-            #ui { font-size: 11px; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); padding: 8px 10px; gap: 6px 10px; }
         }
         /* СТАМИНА: горизонтальная полоска в HUD (расходуется спринтом Shift и щитом N) */
         #stamina-bar-container {
@@ -95,9 +76,7 @@
             color: #ff0055; 
             font-size: 24px; 
             text-align: center; 
-            width: 100%;
-            max-width: 900px;
-            box-sizing: border-box;
+            width: 800px; 
             margin-bottom: 8px; 
             font-weight: bold; 
             display: none; 
@@ -455,16 +434,6 @@
                     <button class="buy-btn" id="btn-buy-flamethrower" onclick="buyUpgrade('flamethrower')">Разблокировать [7] <br> <span id="cost-flamethrower">1800</span> очков</button>
                 </div>
                 <div class="shop-item">
-                    <h3>Револьвер (Пистолет ур.2)</h3>
-                    <p>Вторичное оружие в левой руке (ПКМ). Барабан на 6 патронов, средний урон — добивает скелета за 2 попадания. Перезарядка из ПОЛНОСТЬЮ пустого барабана даёт +200 очков!</p>
-                    <button class="buy-btn" id="btn-buy-revolver" onclick="buyUpgrade('revolver')">Разблокировать (клавиша 5) <br> <span id="cost-revolver">900</span> очков</button>
-                </div>
-                <div class="shop-item">
-                    <h3>Дезерт Игл (Пистолет ур.3)</h3>
-                    <p>Вторичное оружие в левой руке (ПКМ). Урон снайперского уровня в упор, но резко теряет мощность с дистанцией.</p>
-                    <button class="buy-btn" id="btn-buy-deagle" onclick="buyUpgrade('deagle')">Разблокировать (клавиша 5) <br> <span id="cost-deagle">1800</span> очков</button>
-                </div>
-                <div class="shop-item">
                     <h3>Ёмкость Магазинов</h3>
                     <p id="desc-clip">Увеличивает вместимость магазина для всех видов оружия с патронами.</p>
                     <button class="buy-btn" id="btn-buy-clipCapacity" onclick="buyUpgrade('clipCapacity')">Улучшить <br> <span id="cost-clipCapacity">700</span> очков</button>
@@ -513,7 +482,6 @@
         <div>СТАМИНА: <span id="stamina-bar-container"><span id="stamina-bar-fill"></span></span></div>
         <div>ОРУЖИЕ: <span id="weapon-name" style="color: #fff;">ДРОБОВИК [1] (2/2)</span></div>
         <div>ПАТРОНЫ: <span id="ammo-val">100</span> <span id="reload-msg" style="color: yellow;"></span></div>
-        <div>ВТОРИЧНОЕ: <span id="secondary-weapon-icon" style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;background:#2f2f2f;border:1px solid #666;vertical-align:middle;"></span><span id="secondary-weapon-val" style="color:#88ddff;">СТАРТОВЫЙ ПИСТОЛЕТ (12/12) [ПКМ]</span></div>
         <div>ГРАНАТЫ: <span id="grenade-val" style="color:#ffaa55;">ГРАНАТА (0) [Q]</span></div>
         <div>АПТЕЧКИ: <span id="medkit-val" style="color:#66ff88;">АПТЕЧКА (0) [H]</span></div>
         <div>СЧЕТ: <span id="score-val">0</span></div>
@@ -526,7 +494,7 @@
     <div id="stealth-indicator" class="font-mono text-xs mt-1 px-3 py-1 rounded-full border-2 border-green-400 bg-green-900/70 text-green-200" style="display:none;">👁‍🗨 СКРЫТ В КУСТАХ — враги вас не видят</div>
 
     <!-- ПОСТОЯННАЯ ПАНЕЛЬ ИНВЕНТАРЯ ОРУЖИЯ (Tailwind CSS) -->
-    <div id="inventory-bar" class="w-full max-w-[1400px] box-border mt-2 grid grid-cols-[repeat(auto-fit,minmax(72px,1fr))] gap-1.5 bg-black/70 border-2 border-[#221122] rounded-md px-2 py-2 font-mono">
+    <div id="inventory-bar" class="w-[800px] mt-2 flex gap-1.5 bg-black/70 border-2 border-[#221122] rounded-md px-2 py-2 font-mono">
         <!-- Слоты заполняются функцией updateInventoryUI() -->
     </div>
 
@@ -883,7 +851,7 @@ let difficulty = 'EASY';
 
 const multiplayer = { enabled: false, ws: null, myId: null, players: {}, inputSendTimer: 0 };
 let weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
-let shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600, medkit: 200, medkitUpgrade: 350, revolver: 900, deagle: 1800 };
+let shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600, medkit: 200, medkitUpgrade: 350 };
 
 // АПТЕЧКА: расходуемый предмет магазина, лечит фиксированное кол-во HP по нажатию H.
 // medkitUnlocked становится true после ПЕРВОЙ покупки (не сбрасывается при расходовании
@@ -930,41 +898,9 @@ const MINIGUN_SPOOLUP_TIME = 4.0;      // сек. на полный разгон
 const MINIGUN_SPINDOWN_TIME = 3.0;     // сек. инерции довращения после отпускания курка
 const MINIGUN_OVERHEAT_THRESHOLD = 5.0; // сек. непрерывной стрельбы до перегрева
 const MINIGUN_OVERHEAT_DURATION = 10.0; // сек. блокировки стрельбы при перегреве
-let pistolFireRateTimer = 0; // ПЕРЕИСПОЛЬЗУЕТСЯ как общий таймер скорострельности ВТОРИЧНОГО оружия (см. секцию ниже) — раньше обслуживал пистолет как основное оружие, теперь пистолет только вторичный
+let pistolFireRateTimer = 0;
 let flamethrowerTickTimer = 0;
 let meleeCooldownTimer = 0;
-// ==========================================================================
-// ВТОРИЧНОЕ ОРУЖИЕ (ПИСТОЛЕТ В ЛЕВОЙ РУКЕ): всегда при игроке, стреляет ПКМ
-// НЕЗАВИСИМО от того, какое основное оружие (ЛКМ, клавиши 1-8/M) выбрано.
-// '5' больше НЕ переключает основное оружие — теперь это клавиша ЦИКЛИЧЕСКОГО
-// переключения между уже купленными уровнями пистолета: Стартовый -> Револьвер ->
-// Дезерт Игл -> снова Стартовый (что позволяет и повышать, и "понижать" — например,
-// вернуться к Револьверу ради его бонуса очков за перезарядку из пустого барабана).
-// Стартовый уровень переиспользует СУЩЕСТВУЮЩИЕ pistolClip/maxPistolClip.
-// ==========================================================================
-let secondaryTierOwned = { starter: true, revolver: false, deagle: false };
-let equippedSecondaryTier = 'starter'; // 'starter' | 'revolver' | 'deagle'
-let maxRevolverClip = 6;  let revolverClip = 6;  // Стадия 2: барабан РОВНО на 6 патронов
-let maxDeagleClip = 7;    let deagleClip = 7;    // Стадия 3: Дезерт Игл
-let secondaryReloading = false; let secondaryReloadTimer = 0; let secondaryReloadTotalDuration = 0;
-// true, если барабан РЕВОЛЬВЕРА был ПОЛНОСТЬЮ пуст в момент НАЧАЛА перезарядки —
-// по её завершении это даёт бонус +200 очков (уникальный механик Револьвера).
-let secondaryReloadWasEmptyRevolver = false;
-let isRightMouseDown = false;
-
-// БОЕВЫЕ ХАРАКТЕРИСТИКИ НОВОГО ОРУЖИЯ
-const BASE_PISTOL_DAMAGE = 22;
-const BASE_SNIPER_DAMAGE = 220;
-// Револьвер: "средний" урон — 2 попадания добивают скелета (базовое HP скелета
-// на ЛЕГКОЙ сложности = 100) на средней дистанции: 2 * 55 = 110 > 100, а 1 * 55 = 55 < 100.
-const BASE_REVOLVER_DAMAGE = 55;
-// Дезерт Игл: урон снайперского уровня В УПОР (совпадает с BASE_SNIPER_DAMAGE),
-// но резко падает с дистанцией — см. calculateDamage(), weaponType === 'deagle'.
-const BASE_DEAGLE_DAMAGE = 220;
-const DEAGLE_FALLOFF_DIST_STEP = 4;    // "несколько единиц" дистанции = 1 шаг спада урона
-const DEAGLE_FALLOFF_PER_STEP = 0.10;  // -10% урона за каждый пройденный шаг дистанции
-const DEAGLE_MIN_MULTIPLIER = 0.15;    // не даём урону упасть до нуля на большой дистанции
-
 // СИСТЕМА УЛУЧШЕНИЯ БЛИЖНЕГО БОЯ: 0 = Кулак (старт), 1 = Нож (1-я покупка), 2 = Бензопила (2-я покупка)
 let meleeTier = 0;
 const MELEE_TIER_NAMES = ['КУЛАК', 'НОЖ', 'БЕНЗОПИЛА'];
@@ -979,6 +915,8 @@ let reloadTimer = 0;
 let reloadTotalDuration = 1; // используется, чтобы вычислить прогресс анимации смены модели при перезарядке
 
 // БОЕВЫЕ ХАРАКТЕРИСТИКИ НОВОГО ОРУЖИЯ
+const BASE_PISTOL_DAMAGE = 22;
+const BASE_SNIPER_DAMAGE = 220;
 const FLAMETHROWER_DPS = 45;
 const FLAMETHROWER_RANGE = 6.0;
 const FLAMETHROWER_CONE = 0.5; // радианы, половина угла конуса
@@ -1150,7 +1088,7 @@ let mapBlocksGroup;
 let wallMeshes = [];
 let weaponPivot; 
 const entityMeshes = new Map(); 
-let weaponMeshes = { shotgun: null, rifle: null, rocket: null, minigun: null, fist: null, knife: null, chainsaw: null, chainsawChain: null, secondaryPistol: null, sniper: null, flamethrower: null, gauss: null, reloadIcon: null };
+let weaponMeshes = { shotgun: null, rifle: null, rocket: null, minigun: null, fist: null, knife: null, chainsaw: null, chainsawChain: null, pistol: null, sniper: null, flamethrower: null, gauss: null, reloadIcon: null };
 const textures = {};
 
 function makeProceduralNoiseTexture(colorBase, countX=16, countY=16) {
@@ -1527,44 +1465,13 @@ function create3DWeapons() {
     csChain.position.set(0, 0.012, -0.28); chainsawGroup.add(csChain); weaponMeshes.chainsawChain = csChain;
     chainsawGroup.position.set(0.17, -0.2, -0.28); chainsawGroup.visible = false; weaponPivot.add(chainsawGroup); weaponMeshes.chainsaw = chainsawGroup;
 
-    // ==========================================================================
-    // ВТОРИЧНОЕ ОРУЖИЕ (ЛЕВАЯ РУКА, ПКМ): 3 отдельные модели по уровням — Стартовый
-    // пистолет, Револьвер (с барабаном), Дезерт Игл (крупнее, золотистый затвор).
-    // Позиция ЗЕРКАЛЬНА относительно оружия правой руки (отрицательный X = левая
-    // сторона экрана). Видна только модель ТЕКУЩЕГО экипированного уровня — см.
-    // updateSecondaryWeaponVisibility().
-    // ==========================================================================
-    const SECONDARY_HAND_POS = [-0.16, -0.2, -0.32];
-
-    const secStarterGroup = new THREE.Group();
-    const secSlide = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.22), new THREE.MeshLambertMaterial({ color: 0x2f2f2f }));
-    secSlide.position.set(0, 0.02, -0.08); secStarterGroup.add(secSlide);
-    const secGrip = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
-    secGrip.position.set(0, -0.06, 0.03); secStarterGroup.add(secGrip);
-    secStarterGroup.position.set(...SECONDARY_HAND_POS); secStarterGroup.visible = false;
-    weaponPivot.add(secStarterGroup);
-
-    const secRevolverGroup = new THREE.Group();
-    const revBarrel = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.045, 0.24), new THREE.MeshLambertMaterial({ color: 0x555560 }));
-    revBarrel.position.set(0, 0.02, -0.1); secRevolverGroup.add(revBarrel);
-    const revCylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.06, 8), new THREE.MeshLambertMaterial({ color: 0x777788 }));
-    revCylinder.rotation.x = Math.PI / 2; revCylinder.position.set(0, 0.02, 0.0); secRevolverGroup.add(revCylinder);
-    const revGrip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.13, 0.06), new THREE.MeshLambertMaterial({ color: 0x3a2a1a })); // деревянная рукоять
-    revGrip.position.set(0, -0.07, 0.05); secRevolverGroup.add(revGrip);
-    secRevolverGroup.position.set(...SECONDARY_HAND_POS); secRevolverGroup.visible = false;
-    weaponPivot.add(secRevolverGroup);
-
-    const secDeagleGroup = new THREE.Group();
-    const deSlide = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.28), new THREE.MeshLambertMaterial({ color: 0xc9a25a })); // золотистый затвор
-    deSlide.position.set(0, 0.025, -0.1); secDeagleGroup.add(deSlide);
-    const deGrip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.13, 0.06), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
-    deGrip.position.set(0, -0.07, 0.04); secDeagleGroup.add(deGrip);
-    const deBarrelTip = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.06, 8), new THREE.MeshLambertMaterial({ color: 0x0a0a0a }));
-    deBarrelTip.rotation.x = Math.PI / 2; deBarrelTip.position.set(0, 0.025, -0.27); secDeagleGroup.add(deBarrelTip);
-    secDeagleGroup.position.set(...SECONDARY_HAND_POS); secDeagleGroup.visible = false;
-    weaponPivot.add(secDeagleGroup);
-
-    weaponMeshes.secondaryPistol = { starter: secStarterGroup, revolver: secRevolverGroup, deagle: secDeagleGroup };
+    // ПИСТОЛЕТ: компактное стартовое оружие
+    const pistolGroup = new THREE.Group();
+    const pSlide = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.22), new THREE.MeshLambertMaterial({ color: 0x2f2f2f }));
+    pSlide.position.set(0, 0.02, -0.08); pistolGroup.add(pSlide);
+    const pGrip = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
+    pGrip.position.set(0, -0.06, 0.03); pistolGroup.add(pGrip);
+    pistolGroup.position.set(0.16, -0.2, -0.32); pistolGroup.visible = false; weaponPivot.add(pistolGroup); weaponMeshes.pistol = pistolGroup;
 
     // СНАЙПЕРСКАЯ ВИНТОВКА: длинный ствол + прицел
     const sniperGroup = new THREE.Group();
@@ -1628,26 +1535,14 @@ function updateWeaponVisibility() {
     weaponMeshes.fist.visible = (currentWeapon === 'melee' && meleeTier === 0);
     weaponMeshes.knife.visible = (currentWeapon === 'melee' && meleeTier === 1);
     weaponMeshes.chainsaw.visible = (currentWeapon === 'melee' && meleeTier === 2);
+    weaponMeshes.pistol.visible = (currentWeapon === 'pistol' && !isCurrentReloading);
     weaponMeshes.sniper.visible = (currentWeapon === 'sniper' && !isCurrentReloading);
     weaponMeshes.flamethrower.visible = (currentWeapon === 'flamethrower' && !isCurrentReloading);
     weaponMeshes.gauss.visible = (currentWeapon === 'gauss');
     // ПЕРЕКЛЮЧЕНИЕ НА "МОДЕЛЬ ПЕРЕЗАРЯДКИ": во время перезарядки показываем вращающийся значок вместо оружия
     weaponMeshes.reloadIcon.visible = isCurrentReloading;
-    updateSecondaryWeaponVisibility();
     updateInventoryUI();
 }
-
-// ВТОРИЧНОЕ ОРУЖИЕ (ЛЕВАЯ РУКА): показывает модель ТОЛЬКО текущего экипированного
-// уровня (equippedSecondaryTier) и только пока оно НЕ перезаряжается — совершенно
-// независимо от того, какое основное оружие/анимация перезарядки сейчас в правой руке.
-function updateSecondaryWeaponVisibility() {
-    if (!weaponMeshes.secondaryPistol) return;
-    const show = gameState === 'PLAYING' && !secondaryReloading;
-    weaponMeshes.secondaryPistol.starter.visible = show && equippedSecondaryTier === 'starter';
-    weaponMeshes.secondaryPistol.revolver.visible = show && equippedSecondaryTier === 'revolver';
-    weaponMeshes.secondaryPistol.deagle.visible = show && equippedSecondaryTier === 'deagle';
-}
-
 
 // ПОСТОЯННАЯ ПАНЕЛЬ ИНВЕНТАРЯ (Tailwind CSS): показывает всё оружие, его состояние разблокировки и активный слот
 function updateInventoryUI() {
@@ -1658,30 +1553,23 @@ function updateInventoryUI() {
         { key: 'rifle', code: '2', label: 'АВТОМАТ' },
         { key: 'rocket', code: '3', label: 'РАКЕТНИЦА' },
         { key: 'minigun', code: '4', label: 'ПУЛЕМЕТ' },
-        { key: 'secondary', code: '5', label: getSecondaryTierName() }, // ВТОРИЧНОЕ ОРУЖИЕ: всегда экипировано (ПКМ), не привязано к currentWeapon
+        { key: 'pistol', code: '5', label: 'ПИСТОЛЕТ' },
         { key: 'sniper', code: '6', label: 'СНАЙПЕРКА' },
         { key: 'flamethrower', code: '7', label: 'ОГНЕМЁТ' },
         { key: 'gauss', code: '8', label: 'ГАУСС-ВИНТОВКА' },
         { key: 'melee', code: 'M', label: MELEE_TIER_NAMES[meleeTier] }
     ];
     bar.innerHTML = slots.map(s => {
-        // ВТОРИЧНОЕ ОРУЖИЕ всегда разблокировано (Стартовый пистолет есть с самого начала)
-        // и считается "активным" всегда — оно не конкурирует за слот с основным оружием.
-        const unlocked = s.key === 'secondary' ? true : (weaponsUnlocked[s.key] !== undefined ? weaponsUnlocked[s.key] : true);
-        const active = s.key === 'secondary' ? true : (currentWeapon === s.key);
-        const base = 'flex flex-col items-center justify-center rounded px-1 py-1.5 border-2 text-[10px] leading-tight transition-colors duration-150';
+        const unlocked = weaponsUnlocked[s.key] !== undefined ? weaponsUnlocked[s.key] : true;
+        const active = currentWeapon === s.key;
+        const base = 'flex-1 flex flex-col items-center justify-center rounded px-1 py-1.5 border-2 text-[10px] leading-tight transition-colors duration-150';
         const stateClasses = !unlocked
             ? 'border-gray-700 bg-gray-900/60 text-gray-600 grayscale'
             : active
                 ? 'border-red-500 bg-red-900/50 text-white shadow-[0_0_8px_rgba(255,0,50,0.6)]'
                 : 'border-gray-600 bg-black/40 text-gray-300';
         const extra = (s.key === 'melee' && meleeTier === 2) ? `<span class="text-[8px] ${chainsawCharge < 25 ? 'text-red-400' : 'text-orange-300'}">${Math.ceil(chainsawCharge)}%</span>` : '';
-        // ИКОНКА-ЦВЕТ для слота вторичного оружия — показывает текущий экипированный уровень
-        // (Стартовый/Револьвер/Дезерт Игл) тем же цветом, что и его 3D-модель в руке.
-        const swatch = (s.key === 'secondary')
-            ? `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-bottom:1px;background:${getSecondaryTierColor()};border:1px solid #666;"></span>`
-            : '';
-        return `<div class="${base} ${stateClasses}"><span class="font-bold">[${s.code}]</span>${swatch}<span>${unlocked ? s.label : '???'}</span>${extra}</div>`;
+        return `<div class="${base} ${stateClasses}"><span class="font-bold">[${s.code}]</span><span>${unlocked ? s.label : '???'}</span>${extra}</div>`;
     }).join('');
 }
 
@@ -2132,19 +2020,16 @@ function returnToMainMenu() {
     resetMinigunState();
     weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
     gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
-    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600, medkit: 200, medkitUpgrade: 350, revolver: 900, deagle: 1800 };
+    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600, medkit: 200, medkitUpgrade: 350 };
     meleeTier = 0; chainsawCharge = maxChainsawCharge; isChainsawActive = false; chainsawTickTimer = 0;
     grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
     medkitCount = 0; medkitUnlocked = false; medkitHealAmount = 20;
-    secondaryTierOwned = { starter: true, revolver: false, deagle: false }; equippedSecondaryTier = 'starter';
-    pistolClip = maxPistolClip; revolverClip = maxRevolverClip; deagleClip = maxDeagleClip;
-    secondaryReloading = false; secondaryReloadWasEmptyRevolver = false;
     tracers.forEach(t => { if (scene) { scene.remove(t.mesh); if (t.extraMesh) scene.remove(t.extraMesh); } }); tracers = [];
     enemies = []; projectiles = []; particles = []; pickups = [];
     WaveManager.reset();
     bossUi.style.display = "none"; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
     healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)"; reloadUi.innerText = "";
-    updateGrenadeUi(); updateMedkitUi(); updateSecondaryWeaponUi(); updateSecondaryWeaponVisibility(); updateWeaponVisibility(); updateDifficultyUi();
+    updateGrenadeUi(); updateMedkitUi(); updateWeaponVisibility(); updateDifficultyUi();
     gameState = 'START'; document.getElementById("start-overlay").style.display = 'flex';
 }
 
@@ -2180,10 +2065,6 @@ function updateShopUI() {
     if (weaponsUnlocked.sniper) { snBtn.innerText = "КУПЛЕНО"; snBtn.disabled = true; } else { snBtn.innerHTML = `Разблокировать [6] <br> <span>${shopCosts.sniper}</span> очков`; snBtn.disabled = score < shopCosts.sniper; }
     const ftBtn = document.getElementById("btn-buy-flamethrower");
     if (weaponsUnlocked.flamethrower) { ftBtn.innerText = "КУПЛЕНО"; ftBtn.disabled = true; } else { ftBtn.innerHTML = `Разблокировать [7] <br> <span>${shopCosts.flamethrower}</span> очков`; ftBtn.disabled = score < shopCosts.flamethrower; }
-    const revBtn = document.getElementById("btn-buy-revolver");
-    if (secondaryTierOwned.revolver) { revBtn.innerText = "КУПЛЕНО"; revBtn.disabled = true; } else { revBtn.innerHTML = `Разблокировать (клавиша 5) <br> <span>${shopCosts.revolver}</span> очков`; revBtn.disabled = score < shopCosts.revolver; }
-    const deBtn = document.getElementById("btn-buy-deagle");
-    if (secondaryTierOwned.deagle) { deBtn.innerText = "КУПЛЕНО"; deBtn.disabled = true; } else { deBtn.innerHTML = `Разблокировать (клавиша 5) <br> <span>${shopCosts.deagle}</span> очков`; deBtn.disabled = score < shopCosts.deagle; }
     const meleeBtn = document.getElementById("btn-buy-melee");
     if (meleeTier >= 2) { meleeBtn.innerText = "МАКС. УРОВЕНЬ (БЕНЗОПИЛА)"; meleeBtn.disabled = true; }
     else { const nextName = meleeTier === 0 ? 'НОЖ' : 'БЕНЗОПИЛУ'; meleeBtn.innerHTML = `Улучшить до: ${nextName} <br> <span>${shopCosts.melee}</span> очков`; meleeBtn.disabled = score < shopCosts.melee; }
@@ -2216,12 +2097,6 @@ function buyUpgrade(type) {
         score -= shopCosts.sniper; weaponsUnlocked.sniper = true; showCenterMessage("Разблокирована: Снайперская винтовка [6]!");
     } else if (type === 'flamethrower') {
         score -= shopCosts.flamethrower; weaponsUnlocked.flamethrower = true; showCenterMessage("Разблокирован: Огнемёт [7]!");
-    } else if (type === 'revolver') {
-        score -= shopCosts.revolver; secondaryTierOwned.revolver = true; revolverClip = maxRevolverClip;
-        showCenterMessage("Разблокирован Револьвер! Нажмите 5, чтобы экипировать (ПКМ).");
-    } else if (type === 'deagle') {
-        score -= shopCosts.deagle; secondaryTierOwned.deagle = true; deagleClip = maxDeagleClip;
-        showCenterMessage("Разблокирован Дезерт Игл! Нажмите 5, чтобы экипировать (ПКМ).");
     } else if (type === 'melee') {
         if (meleeTier < 2 && score >= shopCosts.melee) {
             score -= shopCosts.melee; meleeTier++;
@@ -2367,14 +2242,10 @@ function attemptMultiplayerConnect() {
             gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
             grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = []; meleeCooldownTimer = 0;
             medkitCount = 0; medkitUnlocked = false; medkitHealAmount = 20;
-            secondaryTierOwned = { starter: true, revolver: false, deagle: false }; equippedSecondaryTier = 'starter';
-            pistolClip = maxPistolClip; revolverClip = maxRevolverClip; deagleClip = maxDeagleClip;
-            secondaryReloading = false; secondaryReloadWasEmptyRevolver = false;
             enemies = []; projectiles = []; particles = []; pickups = [];
             healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)";
-            gameState = 'PLAYING';
-            updateGrenadeUi(); updateMedkitUi(); updateSecondaryWeaponUi(); updateSecondaryWeaponVisibility(); updateWeaponVisibility(); initAudio(); document.getElementById("start-overlay").style.display = 'none';
-            startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
+            updateGrenadeUi(); updateMedkitUi(); updateWeaponVisibility(); initAudio(); document.getElementById("start-overlay").style.display = 'none';
+            gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
         },
         (errorMsg) => { statusEl.style.color = '#ff8080'; statusEl.innerText = errorMsg; }
     );
@@ -2404,8 +2275,7 @@ function startGame(chosenDifficulty, chosenMapKey) {
     screenShakeTimer = 0; damageVignetteTimer = 0;
     const dvEl = document.getElementById("damage-vignette"); if (dvEl) dvEl.style.opacity = 0;
     initAudio(); document.getElementById("start-overlay").style.display = 'none';
-    gameState = 'PLAYING';
-    updateGrenadeUi(); updateMedkitUi(); updateSecondaryWeaponUi(); updateSecondaryWeaponVisibility(); startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
+    updateGrenadeUi(); updateMedkitUi(); gameState = 'PLAYING'; startBackgroundMusic(); updateDifficultyUi(); canvas.requestPointerLock();
 }
 
 function updateDifficultyUi() {
@@ -2434,21 +2304,17 @@ function restartGame() {
     resetMinigunState();
     weaponsUnlocked = { shotgun: true, rifle: false, rocket: false, minigun: false, pistol: true, sniper: false, flamethrower: false, gauss: false };
     gaussCharges = 0; gaussCharging = false; gaussChargePercent = 0;
-    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600, medkit: 200, medkitUpgrade: 350, revolver: 900, deagle: 1800 };
+    shopCosts = { health: 300, damage: 400, rifle: 800, rocket: 1500, minigun: 2000, ammo: 150, clipCapacity: 700, frag: 250, molotov: 300, flash: 300, sniper: 1200, flamethrower: 1800, melee: 600, medkit: 200, medkitUpgrade: 350 };
     meleeTier = 0; chainsawCharge = maxChainsawCharge; isChainsawActive = false; chainsawTickTimer = 0;
     grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
     medkitCount = 0; medkitUnlocked = false; medkitHealAmount = 20;
-    secondaryTierOwned = { starter: true, revolver: false, deagle: false }; equippedSecondaryTier = 'starter';
-    pistolClip = maxPistolClip; revolverClip = maxRevolverClip; deagleClip = maxDeagleClip;
-    secondaryReloading = false; secondaryReloadWasEmptyRevolver = false;
     tracers.forEach(t => { if (scene) { scene.remove(t.mesh); if (t.extraMesh) scene.remove(t.extraMesh); } }); tracers = [];
     enemies = []; projectiles = []; particles = []; pickups = [];
     spawnMapCoins(MAX_MAP_COINS); coinRespawnTimer = COIN_RESPAWN_INTERVAL;
     bossUi.style.display = "none"; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
     WaveManager.reset(); WaveManager.startNextWave();
     healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)"; reloadUi.innerText = "";
-    gameState = 'PLAYING';
-    updateGrenadeUi(); updateMedkitUi(); updateSecondaryWeaponUi(); updateSecondaryWeaponVisibility(); updateWeaponVisibility(); initAudio(); updateDifficultyUi(); canvas.requestPointerLock();
+    updateGrenadeUi(); updateMedkitUi(); updateWeaponVisibility(); gameState = 'PLAYING'; initAudio(); updateDifficultyUi(); canvas.requestPointerLock();
 }
 
 WaveManager.startNextWave();
@@ -2482,10 +2348,9 @@ window.addEventListener('keydown', e => {
             currentWeapon = 'minigun'; weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`; reloadUi.innerText = (isReloading && reloadingWeapon === 'minigun') ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
         } else { showCenterMessage("ЗАБЛОКИРОВАНО! Купите Пулемет в магазине (E)"); }
     }
-    // '5' БОЛЬШЕ НЕ ПЕРЕКЛЮЧАЕТ ОСНОВНОЕ ОРУЖИЕ — пистолет теперь ТОЛЬКО вторичное
-    // оружие (стреляет ПКМ, см. mousedown ниже). Клавиша '5' циклически переключает
-    // УРОВЕНЬ вторичного пистолета среди уже купленных.
-    if (e.code === 'Digit5') { cycleSecondaryPistol(); }
+    if (e.code === 'Digit5') {
+        currentWeapon = 'pistol'; weaponUi.innerText = `ПИСТОЛЕТ [5] (${pistolClip}/${maxPistolClip})`; reloadUi.innerText = (isReloading && reloadingWeapon === 'pistol') ? "(ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
+    }
     if (e.code === 'Digit6') {
         if (weaponsUnlocked.sniper) {
             currentWeapon = 'sniper'; weaponUi.innerText = `СНАЙПЕРКА [6] (${sniperClip}/${maxSniperClip})`; reloadUi.innerText = (isReloading && reloadingWeapon === 'sniper') ? "(ДОЛГАЯ ПЕРЕЗАРЯДКА...)" : ""; updateWeaponVisibility();
@@ -2515,15 +2380,11 @@ window.addEventListener('keydown', e => {
         if (currentWeapon === 'shotgun' && shotgunClip < maxShotgunClip) startShotgunReload();
         if (currentWeapon === 'rifle' && rifleClip < maxRifleClip) startRifleReload();
         if (currentWeapon === 'minigun' && minigunClip < maxMinigunClip) startMinigunReload();
+        if (currentWeapon === 'pistol' && pistolClip < maxPistolClip) startPistolReload();
         if (currentWeapon === 'sniper' && sniperClip < maxSniperClip) startSniperReload();
     }
     if (e.code === 'KeyR' && currentWeapon === 'flamethrower' && !isReloading && flamethrowerFuel < maxFlamethrowerFuel && ammo > 0) {
         startFlamethrowerRefuel();
-    }
-    // R ТАКЖЕ перезаряжает ВТОРИЧНОЕ оружие (если нужно) — независимо от основного,
-    // поскольку это отдельный, полностью самостоятельный боезапас/таймер.
-    if (e.code === 'KeyR' && !secondaryReloading && ammo > 0 && getSecondaryClip() < getSecondaryMaxClip()) {
-        startSecondaryReload();
     }
     // G - СМЕНА ТИПА ГРАНАТЫ, Q - БРОСОК ГРАНАТЫ
     if (e.code === 'KeyG') { cycleGrenadeType(); }
@@ -2535,18 +2396,8 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => keys[e.code] = false);
 
 let isMouseDown = false; let isMouseLocked = false;
-canvas.addEventListener('mousedown', (e) => {
+canvas.addEventListener('mousedown', () => {
     if (gameState !== 'PLAYING') return;
-    if (e.button === 2) {
-        // ПКМ: ВТОРИЧНОЕ ОРУЖИЕ (пистолет в левой руке) — полностью независимо от ЛКМ/основного оружия.
-        isRightMouseDown = true;
-        // ЛОКДАУН БОЯ / "ИГНОРИРОВАТЬ КЛИК": как и с ЛКМ — если щит активен, клик просто
-        // ничего не делает; isRightMouseDown всё равно true, так что стрельба сама
-        // возобновится в update(), как только щит будет деактивирован.
-        if (!isShieldActive) executeSecondaryShot();
-        return;
-    }
-    if (e.button !== 0) return; // средняя кнопка и т.д. — игнорируем
     isMouseDown = true;
     // ЛОКДАУН БОЯ: клик ЛКМ, пока активен щит, ПОЛНОСТЬЮ игнорируется — ни обычный
     // выстрел, ни начало зарядки Гаусс-винтовки не запускаются. isMouseDown всё равно
@@ -2563,10 +2414,7 @@ canvas.addEventListener('mousedown', (e) => {
         executeShot();
     }
 });
-canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // ПКМ теперь стреляет, а не открывает системное меню
-window.addEventListener('mouseup', (e) => {
-    if (e.button === 2) { isRightMouseDown = false; return; }
-    if (e.button !== 0) return;
+window.addEventListener('mouseup', () => {
     isMouseDown = false;
     if (currentWeapon === 'gauss' && gaussCharging) releaseGaussCharge();
 });
@@ -2807,6 +2655,14 @@ function executeShot(dt) {
             isShooting = true; shootTimer = 0; meleeCooldownTimer = MELEE_COOLDOWN;
             const dmg = (meleeTier === 1 ? BASE_MELEE_DAMAGE : FIST_DAMAGE) * damageMultiplier;
             playShotgunSound(); checkHit(0.35, dmg, MELEE_RANGE, false);
+        }
+    } else if (currentWeapon === 'pistol') {
+        // ПИСТОЛЕТ: стартовое оружие, умеренный урон, быстрая перезарядка
+        if (!(isReloading && reloadingWeapon === 'pistol') && pistolClip > 0 && ammo > 0 && pistolFireRateTimer <= 0) {
+            isShooting = true; shootTimer = 0; pistolClip--; ammo--;
+            ammoUi.innerText = ammo; weaponUi.innerText = `ПИСТОЛЕТ [5] (${pistolClip}/${maxPistolClip})`;
+            pistolFireRateTimer = 0.28; playPlasmaSound(); triggerMuzzleFlash(); checkHit(0.05, (BASE_PISTOL_DAMAGE) * damageMultiplier);
+            if (pistolClip <= 0 && ammo > 0 && !isReloading) startPistolReload();
         }
     } else if (currentWeapon === 'sniper') {
         // СНАЙПЕРСКАЯ ВИНТОВКА: огромный урон одним выстрелом, узкий разброс, долгая перезарядка
@@ -3217,6 +3073,11 @@ function startMinigunReload() {
     if (currentWeapon === 'minigun') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
     playReloadSound(); updateWeaponVisibility();
 }
+function startPistolReload() {
+    isReloading = true; reloadingWeapon = 'pistol'; reloadTimer = getReloadTime(0.9); reloadTotalDuration = reloadTimer;
+    if (currentWeapon === 'pistol') reloadUi.innerText = "(ПЕРЕЗАРЯДКА...)";
+    playReloadSound(); updateWeaponVisibility();
+}
 function startSniperReload() {
     // ДОЛГАЯ ПЕРЕЗАРЯДКА: у снайперской винтовки самое долгое время перезарядки из всего арсенала
     isReloading = true; reloadingWeapon = 'sniper'; reloadTimer = getReloadTime(3.2); reloadTotalDuration = reloadTimer;
@@ -3278,14 +3139,6 @@ function calculateDamage(baseDamage, position, targetPosition, weaponType) {
         }
         return baseDamage * multiplier;
     }
-    if (weaponType === 'deagle') {
-        // ДЕЗЕРТ ИГЛ: урон снайперского уровня В УПОР (multiplier=1.0 при distance=0),
-        // затем -10% за каждые DEAGLE_FALLOFF_DIST_STEP юнит(ов) дистанции, с нижним
-        // порогом DEAGLE_MIN_MULTIPLIER (чтобы урон не падал до нуля на большой дальности).
-        const distance = position.distanceTo(targetPosition);
-        const multiplier = Math.max(DEAGLE_MIN_MULTIPLIER, 1.0 - (distance / DEAGLE_FALLOFF_DIST_STEP) * DEAGLE_FALLOFF_PER_STEP);
-        return baseDamage * multiplier;
-    }
     return baseDamage;
 }
 
@@ -3332,117 +3185,6 @@ function checkHit(fovSpread, damage, maxRange, useTracer, weaponType) {
     }
     // ТРАССЕР ПУЛИ: показываем визуальный след выстрела до цели или на максимальную дальность
     if (useTracer) spawnTracer(hitTarget ? minEnemyDist : (maxRange !== Infinity ? maxRange : 25));
-}
-
-// ==========================================================================
-// ВТОРИЧНОЕ ОРУЖИЕ (ПИСТОЛЕТ, ЛЕВАЯ РУКА) — ХЕЛПЕРЫ ПО ТЕКУЩЕМУ УРОВНЮ
-// ==========================================================================
-function getSecondaryMaxClip() {
-    if (equippedSecondaryTier === 'revolver') return maxRevolverClip;
-    if (equippedSecondaryTier === 'deagle') return maxDeagleClip;
-    return maxPistolClip;
-}
-function getSecondaryClip() {
-    if (equippedSecondaryTier === 'revolver') return revolverClip;
-    if (equippedSecondaryTier === 'deagle') return deagleClip;
-    return pistolClip;
-}
-function setSecondaryClip(val) {
-    if (equippedSecondaryTier === 'revolver') revolverClip = val;
-    else if (equippedSecondaryTier === 'deagle') deagleClip = val;
-    else pistolClip = val;
-}
-function getSecondaryTierName() {
-    if (equippedSecondaryTier === 'revolver') return 'РЕВОЛЬВЕР';
-    if (equippedSecondaryTier === 'deagle') return 'ПУСТЫННЫЙ ОРЁЛ';
-    return 'СТАРТОВЫЙ ПИСТОЛЕТ';
-}
-// ЦВЕТ ИКОНКИ ВТОРИЧНОГО ОРУЖИЯ В HUD/ИНВЕНТАРЕ: подобран так, чтобы совпадать с
-// материалами 3D-модели этого уровня в руке игрока (см. secStarterGroup/secRevolverGroup/
-// secDeagleGroup выше) — тёмная сталь у стартового пистолета, вороненая сталь+дерево у
-// револьвера, золотистый затвор у Дезерт Игл.
-function getSecondaryTierColor() {
-    if (equippedSecondaryTier === 'revolver') return '#8a7256';
-    if (equippedSecondaryTier === 'deagle') return '#c9a25a';
-    return '#2f2f2f';
-}
-function getSecondaryBaseDamage() {
-    if (equippedSecondaryTier === 'revolver') return BASE_REVOLVER_DAMAGE;
-    if (equippedSecondaryTier === 'deagle') return BASE_DEAGLE_DAMAGE;
-    return BASE_PISTOL_DAMAGE;
-}
-// 'deagle' как weaponType запускает спад урона по дистанции в calculateDamage();
-// у стартового пистолета и револьвера урон фиксирован независимо от дистанции.
-function getSecondaryWeaponType() {
-    return equippedSecondaryTier === 'deagle' ? 'deagle' : null;
-}
-function getSecondaryFireRate() {
-    if (equippedSecondaryTier === 'revolver') return 0.45; // револьвер — медленнее самозарядного пистолета
-    if (equippedSecondaryTier === 'deagle') return 0.55;   // тяжёлый затвор — самый медленный
-    return 0.28;
-}
-function getSecondaryReloadBaseTime() {
-    if (equippedSecondaryTier === 'revolver') return 1.6; // снаряжение барабона патрон за патроном — дольше всех
-    if (equippedSecondaryTier === 'deagle') return 1.3;
-    return 0.9;
-}
-
-// ВЫСТРЕЛ ИЗ ВТОРИЧНОГО ОРУЖИЯ (ПКМ). Полностью независим от executeShot() (основное
-// оружие/ЛКМ) — свой таймер скорострельности, свой боезапас, своя перезарядка. Патроны
-// расходуются из ОБЩЕГО пула ammo, как и у всех остальных стволов.
-function executeSecondaryShot() {
-    if (gameState !== 'PLAYING' || health <= 0) return;
-    // ЛОКДАУН БОЯ: щит (N) блокирует ЛЮБУЮ стрельбу, включая вторичное оружие.
-    if (isShieldActive) return;
-    if (secondaryReloading) return;
-    if (pistolFireRateTimer > 0) return; // общий таймер скорострельности вторичного оружия
-    if (getSecondaryClip() <= 0) { if (ammo > 0) startSecondaryReload(); return; }
-    if (ammo <= 0) return;
-    setSecondaryClip(getSecondaryClip() - 1); ammo--;
-    ammoUi.innerText = ammo;
-    pistolFireRateTimer = getSecondaryFireRate();
-    playPlasmaSound(); triggerMuzzleFlash();
-    checkHit(0.05, getSecondaryBaseDamage() * damageMultiplier, undefined, true, getSecondaryWeaponType());
-    updateSecondaryWeaponUi();
-    if (getSecondaryClip() <= 0 && ammo > 0) startSecondaryReload();
-}
-
-function startSecondaryReload() {
-    if (secondaryReloading) return;
-    // УНИКАЛЬНЫЙ МЕХАНИК РЕВОЛЬВЕРА: бонус начисляется, только если барабан был
-    // ПОЛНОСТЬЮ пуст В МОМЕНТ НАЧАЛА этой перезарядки (см. завершение в update()).
-    secondaryReloadWasEmptyRevolver = (equippedSecondaryTier === 'revolver' && getSecondaryClip() <= 0);
-    secondaryReloading = true;
-    secondaryReloadTimer = getReloadTime(getSecondaryReloadBaseTime());
-    secondaryReloadTotalDuration = secondaryReloadTimer;
-    playReloadSound(); updateSecondaryWeaponUi(); updateSecondaryWeaponVisibility();
-}
-
-// '5' ЦИКЛИЧЕСКИ переключает ТОЛЬКО среди уже купленных уровней (Стартовый -> Револьвер
-// -> Дезерт Игл -> снова Стартовый). Это одновременно и способ "прокачаться", и способ
-// вернуться к более слабому, но ранее купленному стволу (например, ради бонуса Револьвера).
-function cycleSecondaryPistol() {
-    const order = ['starter', 'revolver', 'deagle'];
-    let idx = order.indexOf(equippedSecondaryTier);
-    for (let i = 0; i < order.length; i++) {
-        idx = (idx + 1) % order.length;
-        if (secondaryTierOwned[order[idx]]) break;
-    }
-    equippedSecondaryTier = order[idx];
-    secondaryReloading = false; // переключение отменяет незавершённую перезарядку предыдущего уровня
-    pistolFireRateTimer = 0;
-    showCenterMessage(`Вторичное оружие: ${getSecondaryTierName()} [ПКМ]`);
-    updateSecondaryWeaponUi(); updateSecondaryWeaponVisibility();
-}
-
-// ОТДЕЛЬНЫЙ HUD-ЭЛЕМЕНТ для вторичного оружия — не пересекается с основным weaponUi.
-function updateSecondaryWeaponUi() {
-    const el = document.getElementById("secondary-weapon-val");
-    if (!el) return;
-    const reloadTxt = secondaryReloading ? " (ПЕРЕЗАРЯДКА...)" : "";
-    el.innerText = `${getSecondaryTierName()} (${getSecondaryClip()}/${getSecondaryMaxClip()})${reloadTxt} [ПКМ]`;
-    const iconEl = document.getElementById("secondary-weapon-icon");
-    if (iconEl) iconEl.style.background = getSecondaryTierColor();
 }
 
 // ==========================================================================
@@ -3564,9 +3306,6 @@ function update(dt) {
         if (currentWeapon === 'gauss') { if (gaussCharging) updateGaussCharging(dt); }
         else executeShot(dt);
     }
-    // ВТОРИЧНОЕ ОРУЖИЕ (ПКМ): держать кнопку = продолжать огонь, полностью независимо
-    // от того, что делает ЛКМ/основное оружие в этом же кадре.
-    if (isRightMouseDown) executeSecondaryShot();
     // Если игрок переключился на другое оружие, пока копился заряд Гаусс-винтовки (клавиши 1-8/M),
     // зарядка отменяется БЕЗ выстрела — оружие в руках сменилось, отпускание ЛКМ больше не должно
     // производить взрыв гаусс-винтовки.
@@ -3696,12 +3435,14 @@ function update(dt) {
             if (justReloaded === 'shotgun') { shotgunClip = Math.min(maxShotgunClip, ammo); }
             else if (justReloaded === 'rifle') { rifleClip = Math.min(maxRifleClip, ammo); }
             else if (justReloaded === 'minigun') { minigunClip = Math.min(maxMinigunClip, ammo); }
+            else if (justReloaded === 'pistol') { pistolClip = Math.min(maxPistolClip, ammo); }
             else if (justReloaded === 'sniper') { sniperClip = Math.min(maxSniperClip, ammo); }
             else if (justReloaded === 'flamethrower') { flamethrowerFuel = maxFlamethrowerFuel; }
             // Обновляем строку оружия в HUD, только если игрок сейчас держит именно перезаряженное оружие
             if (currentWeapon === 'shotgun') weaponUi.innerText = `ДРОБОВИК [1] (${shotgunClip}/${maxShotgunClip})`;
             else if (currentWeapon === 'rifle') weaponUi.innerText = `АВТОМАТ [2] (${rifleClip}/${maxRifleClip})`;
             else if (currentWeapon === 'minigun') weaponUi.innerText = `ПУЛЕМЕТ [4] (${minigunClip}/${maxMinigunClip})`;
+            else if (currentWeapon === 'pistol') weaponUi.innerText = `ПИСТОЛЕТ [5] (${pistolClip}/${maxPistolClip})`;
             else if (currentWeapon === 'sniper') weaponUi.innerText = `СНАЙПЕРКА [6] (${sniperClip}/${maxSniperClip})`;
             else if (currentWeapon === 'flamethrower') weaponUi.innerText = `ОГНЕМЁТ [7] (${Math.ceil(flamethrowerFuel)}/${maxFlamethrowerFuel})`;
             updateWeaponVisibility();
@@ -3715,32 +3456,10 @@ function update(dt) {
             if (currentWeapon === 'shotgun' && shotgunClip <= 0) startShotgunReload();
             else if (currentWeapon === 'rifle' && rifleClip <= 0) startRifleReload();
             else if (currentWeapon === 'minigun' && minigunClip <= 0) startMinigunReload();
+            else if (currentWeapon === 'pistol' && pistolClip <= 0) startPistolReload();
             else if (currentWeapon === 'sniper' && sniperClip <= 0) startSniperReload();
             else if (currentWeapon === 'flamethrower' && flamethrowerFuel <= 0) startFlamethrowerRefuel();
         }
-    }
-
-    // ВТОРИЧНОЕ ОРУЖИЕ (ПИСТОЛЕТ): полностью независимая от основного оружия перезарядка —
-    // работает параллельно, каким бы ни было currentWeapon и isReloading основного оружия.
-    if (secondaryReloading) {
-        secondaryReloadTimer -= dt;
-        if (secondaryReloadTimer <= 0) {
-            secondaryReloading = false;
-            setSecondaryClip(Math.min(getSecondaryMaxClip(), ammo));
-            // УНИКАЛЬНЫЙ МЕХАНИК РЕВОЛЬВЕРА: если барабан был ПОЛНОСТЬЮ пуст в момент
-            // НАЧАЛА этой перезарядки — по её завершении начисляем бонус +200 очков.
-            if (secondaryReloadWasEmptyRevolver) {
-                score += 200; scoreUi.innerText = score;
-                showCenterMessage("РЕВОЛЬВЕР: перезарядка из пустого барабана! +200 очков");
-                secondaryReloadWasEmptyRevolver = false;
-            }
-            updateSecondaryWeaponUi(); updateSecondaryWeaponVisibility();
-        }
-    } else if (ammo > 0 && getSecondaryClip() <= 0) {
-        // Та же страховочная сетка, что и у основного оружия, но независимая: пистолет
-        // сам перезаряжается, когда его барабан/магазин пуст, вне зависимости от того,
-        // какое оружие сейчас в правой руке.
-        startSecondaryReload();
     }
 
     if (!rocketLoaded) {
