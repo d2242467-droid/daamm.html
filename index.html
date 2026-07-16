@@ -1733,6 +1733,30 @@ function buildEnemyMesh(type, isFlyingBoss) {
         const legBL = new THREE.Mesh(legGeom, legMat); legBL.position.set(-0.09, 0.08, -0.08); group.add(legBL);
         const legBR = new THREE.Mesh(legGeom, legMat); legBR.position.set(0.09, 0.08, -0.08); group.add(legBR);
         animator = (time) => { const swing = Math.sin(time * 10) * 0.4; legFL.rotation.x = swing; legBR.rotation.x = swing; legFR.rotation.x = -swing; legBL.rotation.x = -swing; };
+    } else if (type === 'eliteCreeper') {
+        // ЭЛИТНЫЙ КРИПЕР: ТА ЖЕ базовая модель, что у обычного 'creeper' выше (те же локальные
+        // координаты частей тела), но с тёмно-красным "тлеющим" акцентом вместо чёрного лица
+        // (читается как "заряженный к взрыву") и увеличенная целиком через group.scale.
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), new THREE.MeshLambertMaterial({ color: 0x1b8a1b }));
+        head.position.y = 0.7; group.add(head);
+        const face = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.05), new THREE.MeshBasicMaterial({ color: 0xff3300 }));
+        face.position.set(0, 0.7, 0.16); group.add(face);
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, 0.2), new THREE.MeshLambertMaterial({ color: 0x0c4d0c }));
+        torso.position.y = 0.3; group.add(torso);
+        const legGeom = new THREE.BoxGeometry(0.12, 0.16, 0.12); const legMat = new THREE.MeshLambertMaterial({ color: 0x0a2e0a });
+        const legFL = new THREE.Mesh(legGeom, legMat); legFL.position.set(-0.09, 0.08, 0.08); group.add(legFL);
+        const legFR = new THREE.Mesh(legGeom, legMat); legFR.position.set(0.09, 0.08, 0.08); group.add(legFR);
+        const legBL = new THREE.Mesh(legGeom, legMat); legBL.position.set(-0.09, 0.08, -0.08); group.add(legBL);
+        const legBR = new THREE.Mesh(legGeom, legMat); legBR.position.set(0.09, 0.08, -0.08); group.add(legBR);
+        animator = (time) => {
+            const swing = Math.sin(time * 10) * 0.4; legFL.rotation.x = swing; legBR.rotation.x = swing; legFR.rotation.x = -swing; legBL.rotation.x = -swing;
+            // "Тлеющее" лицо пульсирует ярче/темнее — тот же читаемый сигнал угрозы, что и у роя
+            const emberPulse = 0.6 + Math.sin(time * 5) * 0.4;
+            face.material.color.setRGB(0.8 + emberPulse * 0.2, 0.1 * emberPulse, 0);
+        };
+        // МАСШТАБ: увеличиваем ВСЮ модель целиком (ELITE_CREEPER_SCALE = 1.7x) — крупнее и заметнее
+        // обычного крипера на поле боя.
+        group.scale.set(ELITE_CREEPER_SCALE, ELITE_CREEPER_SCALE, ELITE_CREEPER_SCALE);
     } else if (type === 'skeleton') {
         const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.25), new THREE.MeshLambertMaterial({ color: 0x9f8db3 }));
         head.position.y = 0.75; group.add(head);
@@ -1745,6 +1769,25 @@ function buildEnemyMesh(type, isFlyingBoss) {
         const blaster = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.25), new THREE.MeshLambertMaterial({ color: 0x4c3a5c }));
         blaster.position.set(0.16, 0.4, 0.1); group.add(blaster);
         animator = (time) => { blaster.position.y = 0.4 + Math.sin(time * 6) * 0.02; };
+    } else if (type === 'bigSkeleton') {
+        // БОЛЬШОЙ СКЕЛЕТ-СНАЙПЕР: ТА ЖЕ базовая модель, что у обычного 'skeleton' выше (те же
+        // локальные координаты костей), но с красными "снайперскими" акцентами вместо голубых,
+        // удлинённым стволом и увеличенная целиком через group.scale в конце ветки.
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.25), new THREE.MeshLambertMaterial({ color: 0x9f8db3 }));
+        head.position.y = 0.75; group.add(head);
+        const spine = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), new THREE.MeshLambertMaterial({ color: 0x2c2438 }));
+        spine.position.y = 0.38; group.add(spine);
+        const rib1 = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.04, 0.15), new THREE.MeshLambertMaterial({ color: 0x8a75a3 }));
+        rib1.position.set(0, 0.5, 0); group.add(rib1); const rib2 = rib1.clone(); rib2.position.y = 0.4; group.add(rib2);
+        const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.02), new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+        eyeL.position.set(-0.06, 0.77, 0.125); group.add(eyeL); const eyeR = eyeL.clone(); eyeR.position.x = 0.06; group.add(eyeR);
+        // Удлинённый ствол (визуально читается как "снайперская винтовка")
+        const blaster = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.42), new THREE.MeshLambertMaterial({ color: 0x3a2a45 }));
+        blaster.position.set(0.16, 0.4, 0.16); group.add(blaster);
+        animator = (time) => { blaster.position.y = 0.4 + Math.sin(time * 4) * 0.015; };
+        // МАСШТАБ: увеличиваем ВСЮ модель целиком (BIG_SKELETON_SCALE = 1.8x), чтобы враг сразу
+        // визуально читался как более крупная и опасная угроза на поле боя.
+        group.scale.set(BIG_SKELETON_SCALE, BIG_SKELETON_SCALE, BIG_SKELETON_SCALE);
     } else if (type === 'flyer') {
         // ФАНТОМ-СТИЛЬ: тёмно-синие/серые рваные кожистые крылья (textures.phantom),
         // светящиеся зелёные глаза, полупрозрачное "призрачное" тело.
@@ -1789,7 +1832,7 @@ function buildEnemyMesh(type, isFlyingBoss) {
     // от направления на камеру. Вместо этого возвращаем его отдельно: вызывающий код добавляет
     // его в scene НАПРЯМУЮ и позиционирует независимо от вращения тела врага.
     const healthBar = create3DHealthBar(type);
-    const healthBarOffsetY = (type === 'boss') ? (isFlyingBoss ? 2.0 : 2.2) : (type === 'flyer' ? 1.0 : (type === 'swarm' ? 0.42 : 1.1));
+    const healthBarOffsetY = (type === 'boss') ? (isFlyingBoss ? 2.0 : 2.2) : (type === 'flyer' ? 1.0 : (type === 'swarm' ? 0.42 : (type === 'bigSkeleton' ? 2.0 : (type === 'eliteCreeper' ? 1.9 : 1.1))));
     return { mesh: group, animator: animator, healthBar: healthBar, healthBarOffsetY: healthBarOffsetY };
 }
 
@@ -1878,7 +1921,12 @@ function syncEntitiesWith3DScene() {
         // перед выстрелом наземного Вордена — сам выстрел рендерится отдельно, одноразовым
         // цилиндром-"стеклянной трубкой" через spawnWardenVoidBeam() (см. ниже), независимо
         // от этого постоянного per-enemy меша.
-        if (enemy.type === 'boss') {
+        // BigSkeleton ТОЖЕ заходит в эту ветку — он переиспользует ТОЛЬКО телеграф-сферу
+        // (voidChargeOrb) перед своим одиночным точным выстрелом; laserBeam/warnRing у него
+        // просто никогда не становятся видимыми, т.к. он не летает и не использует warn-состояния.
+        // EliteCreeper ТОЖЕ заходит сюда — он переиспользует ТОЛЬКО красное кольцо-предупреждение
+        // (warnRing), т.к. его 'warn'/'explode' цикл ИДЕНТИЧЕН циклу Вордена (см. ниже).
+        if (enemy.type === 'boss' || enemy.type === 'bigSkeleton' || enemy.type === 'eliteCreeper') {
             if (!entityData.laserBeam) {
                 // ТОНКИЙ MESH вместо THREE.Line: linewidth у LineBasicMaterial игнорируется
                 // почти всеми WebGL-бэкендами (всегда ~1px), из-за чего луч был практически не
@@ -1935,15 +1983,14 @@ function syncEntitiesWith3DScene() {
                 }
             }
 
-            entityData.warnRing.visible = (enemy.abilityState === 'warn' || enemy.abilityState === 'phase2AoeWarn');
+            entityData.warnRing.visible = (enemy.abilityState === 'warn' || enemy.abilityState === 'phase2OpenWarn');
             if (entityData.warnRing.visible) { entityData.warnRing.position.set(enemy.warnX, 0.05, enemy.warnY); }
 
             entityData.voidChargeOrb.visible = (!enemy.isFlying && enemy.abilityState === 'voidCharge');
             if (entityData.voidChargeOrb.visible) {
                 // Пульсация размера/яркости нарастает по мере приближения момента выстрела —
                 // читаемый визуальный сигнал "атака вот-вот произойдёт".
-                const chargeTotal = enemy.abilityDurationTotal || WARDEN_BEAM_CHARGE_TIME;
-                const chargeProgress = 1 - Math.max(0, enemy.abilityDuration) / chargeTotal; // 0 -> 1
+                const chargeProgress = 1 - Math.max(0, enemy.abilityDuration) / WARDEN_BEAM_CHARGE_TIME; // 0 -> 1
                 const pulse = 1 + Math.sin(time * 18) * 0.15;
                 const scale = (0.55 + chargeProgress * 0.9) * pulse;
                 entityData.voidChargeOrb.scale.set(scale, scale, scale);
@@ -2291,8 +2338,28 @@ function spawnEnemy(isBoss = false) {
             } else {
                 let type;
                 if (settings.flyingEnemies) { const r = Math.random(); type = r < 0.34 ? 'creeper' : (r < 0.67 ? 'skeleton' : 'flyer'); } else { type = Math.random() > 0.5 ? 'creeper' : 'skeleton'; }
+                // БОЛЬШОЙ СКЕЛЕТ-СНАЙПЕР: редкий "элитный" вариант — проверяется ТОЛЬКО когда дайс
+                // уже выбрал 'skeleton', чтобы не менять пропорции creeper/flyer в общем ростере.
+                if (type === 'skeleton' && Math.random() < BIG_SKELETON_SPAWN_CHANCE) type = 'bigSkeleton';
+                // ЭЛИТНЫЙ КРИПЕР: аналогично — редкий вариант, проверяется ТОЛЬКО когда дайс уже
+                // выбрал 'creeper'.
+                if (type === 'creeper' && Math.random() < ELITE_CREEPER_SPAWN_CHANCE) type = 'eliteCreeper';
                 if (type === 'creeper') { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: creeperHp, maxHealth: creeperHp, speed: 1.6, size: 0.45 }); }
+                else if (type === 'eliteCreeper') {
+                    const eliteCreeperHp = Math.round(creeperHp * ELITE_CREEPER_HP_MULTIPLIER);
+                    // РАЗМЕР ХИТБОКСА масштабируется вместе с визуалом (ELITE_CREEPER_SCALE), а
+                    // скорость чуть ниже обычного крипера — держится на дистанции для своей AoE-
+                    // атаки, а не слепо бежит на игрока, как классический крипер-смертник.
+                    enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: eliteCreeperHp, maxHealth: eliteCreeperHp, speed: 1.3, size: 0.45 * ELITE_CREEPER_SCALE });
+                }
                 else if (type === 'skeleton') { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: skeletonHp, maxHealth: skeletonHp, speed: 1.2, size: 0.45 }); }
+                else if (type === 'bigSkeleton') {
+                    const bigSkeletonHp = Math.round(skeletonHp * BIG_SKELETON_HP_MULTIPLIER);
+                    // РАЗМЕР ХИТБОКСА масштабируется вместе с визуалом (BIG_SKELETON_SCALE), а
+                    // скорость ниже обычного скелета — снайпер предпочитает держать дистанцию,
+                    // а не сближаться, полагаясь на дальний точный выстрел.
+                    enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0, type: type, health: bigSkeletonHp, maxHealth: bigSkeletonHp, speed: 0.9, size: 0.45 * BIG_SKELETON_SCALE });
+                }
                 else { enemies.push({ x: rx + 0.5, y: ry + 0.5, z: 0.9, type: type, health: flyerHp, maxHealth: flyerHp, speed: 2.0, size: 0.4, isFlying: true, hoverPhase: Math.random() * Math.PI * 2 }); }
             }
             spawned = true;
@@ -3100,39 +3167,61 @@ function spawnWardenVoidBeam(from, to) {
 }
 
 // ==========================================================================
-// ФАЗА 2 БОССА (ВОЗРОЖДЕНИЕ) + ЛАЗЕР ОЧЕРЕДЬЮ ИЗ 5 ВЫСТРЕЛОВ.
-// ФАЗА 1 И ФАЗА 2: 5 быстрых последовательных выстрелов ПО ИГРОКУ (каждый выстрел заново
-// нацеливается — трекает текущую позицию игрока прямо перед выстрелом, т.к. игрок мог
-// сдвинуться между выстрелами очереди) — вместо старого непрерывного луча.
-// В Фазе 2 телеграф (заряд) перед очередью длиннее на BOSS_PHASE2_LASER_WINDUP_BONUS секунд,
-// чтобы компенсировать прицельный (а не веерный) характер атаки и оставить игроку время увернуться.
-// AoE-взрыв в Фазе 2 (см. phase2AoeWarn/phase2AoeExplode ниже) ВСЕГДА тройной — и при открытии
-// фазы, и при каждом последующем выборе этой атаки, с небольшой задержкой между взрывами.
+// ФАЗА 2 БОССА (ВОЗРОЖДЕНИЕ) + ЛАЗЕР ОЧЕРЕДЬЮ.
+// ФАЗА 1: 5 быстрых последовательных выстрелов ПО ИГРОКУ (каждый выстрел заново нацеливается,
+// т.к. игрок мог сдвинуться между выстрелами) — вместо старого непрерывного луча.
+// ФАЗА 2 (BULLET-HELL): BOSS_PHASE2_LASER_COUNT (25) лучей одновременно/очень быстрой очередью,
+// равномерно распределённых на 360° вокруг босса (Math.cos/Math.sin), НЕ привязана к позиции
+// игрока, и бьёт чуть ниже обычной высоты (BOSS_PHASE2_LASER_HEIGHT_OFFSET). Открывающая атака
+// Фазы 2 — радиальный AoE-взрыв из 5 точек по кругу вокруг босса (см. ниже).
 // ==========================================================================
-const BOSS_LASER_SHOT_COUNT = 5;        // выстрелов в одной очереди лазера
-const BOSS_LASER_SHOT_INTERVAL = 0.15;  // сек. между выстрелами внутри очереди
+const BOSS_LASER_SHOT_COUNT = 5;        // выстрелов в одной очереди лазера (Фаза 1, прицельно по игроку)
+const BOSS_LASER_SHOT_INTERVAL = 0.15;  // сек. между выстрелами внутри очереди (Фаза 1)
 const BOSS_LASER_SHOT_DAMAGE = 24;      // урон ОДНОГО выстрела (разовое попадание, не DPS)
-const BOSS_PHASE2_LASER_WINDUP_BONUS = 0.3; // доп. задержка телеграфа лазера в Фазе 2 (сек.)
-const BOSS_PHASE2_AOE_COUNT = 3;        // количество взрывов в AoE-атаке Фазы 2 ("тройной")
+const BOSS_LASER_SHOT_RANGE = 14;       // дальность одного выстрела в омни-направленном режиме (Фаза 2)
+const BOSS_PHASE2_LASER_COUNT = 25;     // BULLET-HELL: лучей в радиальном залпе Фазы 2 (360° по кругу, одновременно)
+const BOSS_PHASE2_LASER_HEIGHT_OFFSET = 0.35; // насколько ниже обычной высоты (1.3) бьют лучи радиального залпа Фазы 2
+const BOSS_PHASE2_AOE_COUNT = 5;        // BULLET-HELL: взрывов в открывающей атаке Фазы 2 (было 3 "тройной" в одной точке, стало 5 по кругу)
 const BOSS_PHASE2_AOE_RADIUS = 3.2;
 const BOSS_PHASE2_AOE_DAMAGE = 60;
-const BOSS_PHASE2_AOE_STAGGER = 0.15;   // сек. между тремя взрывами AoE-атаки Фазы 2
+const BOSS_PHASE2_AOE_STAGGER = 0.15;   // сек. между взрывами открытия Фазы 2
+const BOSS_PHASE2_AOE_DISTANCE = 4.0;   // BULLET-HELL: расстояние от босса, на котором взрывы распределяются по кругу
 
 // Выпускает ОДИН разовый выстрел лазера (в отличие от spawnWardenVoidBeam, который просто рисует
-// луч, эта функция ЕЩЁ И считает попадание/урон). Работает одинаково в обеих фазах: цель — ТЕКУЩАЯ
-// позиция игрока, считанная заново на каждый вызов (т.е. на каждый выстрел очереди), что и даёт
-// эффект "прицеливания" по игроку прямо перед выстрелом.
-function fireBossLaserShot(enemy, shotIndex) {
-    const targetX = playerX, targetY = playerY, targetHeight = 0.75 + playerZ;
-    const mouth = new THREE.Vector3(enemy.x, 1.3, enemy.y);
-    // lookAt-style aim: цель луча — ТЕКУЩАЯ позиция игрока (пересчитана заново для этого выстрела),
-    // то есть луч геометрически направлен ("look-at") прямо на игрока, а не в фиксированную сторону.
+// луч, эта функция ЕЩЁ И считает попадание/урон). radial=false -> целится в игрока (Фаза 1);
+// radial=true -> направление фиксировано по кругу вокруг босса, shotIndex-й из BOSS_LASER_SHOT_COUNT
+// равномерно распределённых направлений (Фаза 2, омни-направленный веер).
+// Выпускает ОДИН разовый выстрел лазера (в отличие от spawnWardenVoidBeam, который просто рисует
+// луч, эта функция ЕЩЁ И считает попадание/урон). radial=false -> целится в игрока (Фаза 1);
+// radial=true -> направление фиксировано по кругу вокруг босса, shotIndex-й из BOSS_LASER_SHOT_COUNT
+// равномерно распределённых направлений (Фаза 2, омни-направленный веер).
+// damage — необязательный параметр (по умолчанию урон обычного выстрела босса), позволяющий
+// ДРУГИМ врагам (например, BigSkeleton — см. ниже) переиспользовать ЭТУ ЖЕ функцию прицеливания/
+// рендера/попадания без дублирования кода, просто со своим значением урона.
+function fireBossLaserShot(enemy, radial, shotIndex, totalCount = BOSS_LASER_SHOT_COUNT, damage = BOSS_LASER_SHOT_DAMAGE) {
+    let targetX, targetY, targetHeight, mouthHeight;
+    if (radial) {
+        // BULLET-HELL: shotIndex-й из totalCount лучей, распределённых РАВНОМЕРНО по полному кругу
+        // (Math.sin/Math.cos от угла) — при totalCount = BOSS_PHASE2_LASER_COUNT (25) это плотный
+        // радиальный залп на 360° вокруг босса, а не прицельные выстрелы по игроку.
+        const angle = (Math.PI * 2 / totalCount) * shotIndex;
+        targetX = enemy.x + Math.cos(angle) * BOSS_LASER_SHOT_RANGE;
+        targetY = enemy.y + Math.sin(angle) * BOSS_LASER_SHOT_RANGE;
+        // Высота залпа Фазы 2 чуть ниже обычной высоты пасти босса (1.3), чтобы визуально отличать
+        // радиальный веер от прицельного лазера Фазы 1.
+        mouthHeight = 1.3 - BOSS_PHASE2_LASER_HEIGHT_OFFSET;
+        targetHeight = 1.3 - BOSS_PHASE2_LASER_HEIGHT_OFFSET;
+    } else {
+        targetX = playerX; targetY = playerY; targetHeight = 0.75 + playerZ;
+        mouthHeight = 1.3;
+    }
+    const mouth = new THREE.Vector3(enemy.x, mouthHeight, enemy.y);
     const target = new THREE.Vector3(targetX, targetHeight, targetY);
     spawnWardenVoidBeam(mouth, target);
     playPlasmaSound();
     const distToBeam = distancePointToSegment2D(playerX, playerY, enemy.x, enemy.y, targetX, targetY);
     if (distToBeam <= WARDEN_BEAM_HIT_RADIUS) {
-        takeDamage(BOSS_LASER_SHOT_DAMAGE);
+        takeDamage(damage);
         addDamageIndicator(Math.atan2(enemy.y - playerY, enemy.x - playerX));
         spawnBlood(playerX, playerY, 2);
     }
@@ -3154,6 +3243,42 @@ const MINION_SPEED = 3.0;
 const MINION_SIZE = 0.3;
 const MINION_DAMAGE = 1;           // 1 очко урона за удар
 const MINION_ATTACK_COOLDOWN = 1.0; // атакует не чаще раза в секунду (см. per-minion enemy.attackCooldown)
+
+// ==========================================================================
+// БОЛЬШОЙ СКЕЛЕТ-СНАЙПЕР (BIG SKELETON): редкий "элитный" вариант обычного скелета.
+// Визуально — та же модель, что у 'skeleton' (см. buildEnemyMesh), но крупнее (BIG_SKELETON_SCALE)
+// и живучее. Вместо плазменных снарядов обычного скелета — ОДИН точный лазерный выстрел по
+// игроку за раз (переиспользует fireBossLaserShot(enemy, false, 0, damage) — ТУ ЖЕ функцию
+// прицеливания/рендера луча, что и Ворден, включая тот же телеграф voidCharge — но БЕЗ AoE-
+// взрыва: fireBossLaserShot никогда не создаёт взрывов, это делает исключительно отдельная
+// ветка 'warn'/'explode' боевого цикла Вордена, к которой BigSkeleton не обращается).
+// ==========================================================================
+const BIG_SKELETON_SPAWN_CHANCE = 0.15;   // ~15% шанс, что заспавненный 'skeleton' окажется элитным снайпером
+const BIG_SKELETON_SCALE = 1.8;           // масштаб 3D-модели относительно обычного скелета
+const BIG_SKELETON_HP_MULTIPLIER = 2.5;   // здоровье = базовое HP скелета * этот множитель
+const BIG_SKELETON_LASER_DAMAGE = 30;     // урон ОДНОГО точного выстрела
+const BIG_SKELETON_LASER_RANGE = 16;      // дальность обнаружения игрока для начала атаки
+const BIG_SKELETON_LASER_MIN_RANGE = 1.5; // слишком близко — не стреляет (снайпер держит дистанцию)
+const BIG_SKELETON_COOLDOWN_MIN = 3.5;    // мин. пауза между выстрелами (после выстрела)
+const BIG_SKELETON_COOLDOWN_MAX = 5.5;    // макс. пауза между выстрелами
+
+// ==========================================================================
+// ЭЛИТНЫЙ КРИПЕР (ELITE CREEPER): редкий "элитный" вариант обычного крипера. Визуально —
+// та же модель, что у 'creeper' (см. buildEnemyMesh), но крупнее (ELITE_CREEPER_SCALE) и
+// живучее. Вместо мгновенного самоподрыва по касанию (как у обычного крипера) — телеграфируемая
+// ДИСТАНЦИОННАЯ AoE-атака: красное кольцо-предупреждение на позиции игрока -> короткая пауза ->
+// взрыв. Использует ТЕ ЖЕ 'warn'/'explode' состояния и ТЕ ЖЕ функции spawnBlueExplosion()/
+// applyAoeDamage(), что и наземный Ворден — никакой новой логики взрыва не создаётся.
+// ==========================================================================
+const ELITE_CREEPER_SPAWN_CHANCE = 0.18;   // ~18% шанс, что заспавненный 'creeper' окажется элитным
+const ELITE_CREEPER_SCALE = 1.7;           // масштаб 3D-модели относительно обычного крипера
+const ELITE_CREEPER_HP_MULTIPLIER = 3.0;   // здоровье = базовое HP крипера * этот множитель
+const ELITE_CREEPER_AOE_RADIUS = 2.6;
+const ELITE_CREEPER_AOE_DAMAGE = 40;
+const ELITE_CREEPER_AOE_RANGE = 9;         // должен быть в пределах этой дистанции от игрока, чтобы начать телеграф
+const ELITE_CREEPER_WARN_DURATION = 1.1;   // длительность красного кольца-предупреждения перед взрывом
+const ELITE_CREEPER_COOLDOWN_MIN = 4.0;    // мин. пауза между взрывами (после взрыва)
+const ELITE_CREEPER_COOLDOWN_MAX = 6.0;    // макс. пауза между взрывами
 
 // ЦЕНТРАЛИЗОВАННЫЙ УЧЁТ УРОНА ПО БОССУ: вызывается из КАЖДОГО места, наносящего урон боссу,
 // ВМЕСТО прямого обновления bossHpUi — обновляет HUD И копит счётчик урона для триггера роя.
@@ -3905,7 +4030,7 @@ function update(dt) {
                     // ГАУСС-ВИНТОВКА: гарантированный дроп ТОЛЬКО с боссов (недоступна в магазине)
                     pickups.push({ x: enemy.x + 0.3, y: enemy.y + 0.3, type: 'gauss', bounceTimer: Math.random() * 10 });
                 }
-                else { score += enemy.type === 'creeper' ? 100 : (enemy.type === 'swarm' ? 15 : 150); }
+                else { score += enemy.type === 'creeper' ? 100 : (enemy.type === 'swarm' ? 15 : (enemy.type === 'bigSkeleton' ? 400 : (enemy.type === 'eliteCreeper' ? 350 : 150))); }
                 scoreUi.innerText = score; return false;
             }
 
@@ -3952,6 +4077,68 @@ function update(dt) {
                 }
             }
 
+            // БОЛЬШОЙ СКЕЛЕТ-СНАЙПЕР: точный ОДИНОЧНЫЙ лазерный выстрел (переиспользует
+            // fireBossLaserShot Вордена — см. константы BIG_SKELETON_* выше). Цикл: ожидание
+            // до входа в радиус видимости -> телеграф (voidCharge, та же длительность, что у
+            // Вордена) -> РОВНО ОДИН выстрел -> случайная пауза перед следующим циклом. Нет
+            // ни очереди из нескольких выстрелов, ни AoE/взрыва — fireBossLaserShot их не создаёт.
+            if (enemy.type === 'bigSkeleton') {
+                if (enemy.abilityTimer === undefined) { enemy.abilityTimer = 1 + Math.random() * 2; enemy.abilityState = 'idle'; }
+                enemy.abilityTimer -= dt;
+                if (enemy.abilityState === 'idle' && enemy.abilityTimer <= 0) {
+                    const distToPlayerLaser = Math.hypot(playerX - enemy.x, playerY - enemy.y);
+                    if (distToPlayerLaser < BIG_SKELETON_LASER_RANGE && distToPlayerLaser > BIG_SKELETON_LASER_MIN_RANGE && enemyHasLineOfSight(enemy)) {
+                        enemy.abilityState = 'voidCharge'; enemy.abilityDuration = WARDEN_BEAM_CHARGE_TIME;
+                    } else {
+                        enemy.abilityTimer = 0.4; // цель вне зоны/видимости — переоценить чуть позже, не спамить проверку каждый кадр
+                    }
+                } else if (enemy.abilityState === 'voidCharge') {
+                    enemy.abilityDuration -= dt;
+                    if (enemy.abilityDuration <= 0) {
+                        // ОДИН выстрел, radial=false -> точное прицеливание в игрока (см. fireBossLaserShot).
+                        fireBossLaserShot(enemy, false, 0, BOSS_LASER_SHOT_COUNT, BIG_SKELETON_LASER_DAMAGE);
+                        enemy.abilityState = 'idle';
+                        enemy.abilityTimer = BIG_SKELETON_COOLDOWN_MIN + Math.random() * (BIG_SKELETON_COOLDOWN_MAX - BIG_SKELETON_COOLDOWN_MIN);
+                    }
+                }
+            }
+
+            // ЭЛИТНЫЙ КРИПЕР: телеграфируемая дистанционная AoE-атака. Цикл: ожидание до входа в
+            // радиус -> красное кольцо-предупреждение (WARN, ELITE_CREEPER_WARN_DURATION сек, на
+            // ПОЗИЦИИ ИГРОКА, зафиксированной в момент начала телеграфа) -> ВЗРЫВ (переиспользует
+            // spawnBlueExplosion()/applyAoeDamage() Вордена БЕЗ ИЗМЕНЕНИЙ, только другие радиус/урон
+            // через ELITE_CREEPER_AOE_*) -> случайная пауза перед следующим циклом (кулдаун).
+            if (enemy.type === 'eliteCreeper') {
+                if (enemy.abilityTimer === undefined) { enemy.abilityTimer = 1.5 + Math.random() * 1.5; enemy.abilityState = 'idle'; }
+                enemy.abilityTimer -= dt;
+                if (enemy.abilityState === 'idle' && enemy.abilityTimer <= 0) {
+                    const distToPlayerAoe = Math.hypot(playerX - enemy.x, playerY - enemy.y);
+                    if (distToPlayerAoe < ELITE_CREEPER_AOE_RANGE) {
+                        enemy.abilityState = 'warn'; enemy.abilityDuration = ELITE_CREEPER_WARN_DURATION;
+                        enemy.warnX = playerX; enemy.warnY = playerY;
+                        showCenterMessage("ЭЛИТНЫЙ КРИПЕР: ГОТОВИТ ВЗРЫВ!");
+                    } else {
+                        enemy.abilityTimer = 0.4; // цель вне радиуса — переоценить чуть позже, не спамить проверку каждый кадр
+                    }
+                } else if (enemy.abilityState === 'warn') {
+                    enemy.abilityDuration -= dt;
+                    if (enemy.abilityDuration <= 0) {
+                        enemy.abilityState = 'explode'; enemy.abilityDuration = 0.35;
+                        // ПЕРЕИСПОЛЬЗОВАНИЕ ВЗРЫВА БОССА: ни новой визуальной, ни новой урон-функции —
+                        // ровно те же spawnBlueExplosion/applyAoeDamage, что и в 'warn'->'explode'
+                        // Вордена выше по файлу.
+                        spawnBlueExplosion(enemy.warnX, enemy.warnY, 0.1);
+                        applyAoeDamage(enemy.warnX, enemy.warnY, ELITE_CREEPER_AOE_RADIUS, ELITE_CREEPER_AOE_DAMAGE, true);
+                    }
+                } else if (enemy.abilityState === 'explode') {
+                    enemy.abilityDuration -= dt;
+                    if (enemy.abilityDuration <= 0) {
+                        enemy.abilityState = 'idle';
+                        enemy.abilityTimer = ELITE_CREEPER_COOLDOWN_MIN + Math.random() * (ELITE_CREEPER_COOLDOWN_MAX - ELITE_CREEPER_COOLDOWN_MIN);
+                    }
+                }
+            }
+
             // БОСС: ВОРДЕН (наземный) — лазер по линии огня + земляной взрыв с предупреждением;
             // ЛЕТАЮЩИЙ БОСС (ХАРД) — постоянный луч сверху + призыв летающих миньонов
             if (enemy.type === 'boss') {
@@ -3985,31 +4172,23 @@ function update(dt) {
                     }
                 } else {
                     // ВОРДЕН: цикл способностей. enemy.phase: 1 = обычный цикл (лазер очередью ПО
-                    // ИГРОКУ / земляной взрыв одним взрывом), 2 = лазер очередью ПО ИГРОКУ (с более
-                    // длинным телеграфом) / AoE-взрыв ВСЕГДА тройной (не только при открытии фазы).
+                    // ИГРОКУ / земляной взрыв), 2 = после возрождения — ОТКРЫТИЕ строго тройным
+                    // AoE-взрывом один раз, далее лазер очередью веером (омни-направленно).
                     if (enemy.abilityState === 'idle' && enemy.abilityTimer <= 0) {
                         if (enemy.phase === 2 && !enemy.phase2OpeningDone) {
                             // ОТКРЫТИЕ ФАЗЫ 2: первая атака ОБЯЗАНА быть тройным AoE-взрывом на
                             // текущей позиции игрока — минуем случайный выбор способности.
                             enemy.phase2OpeningDone = true;
-                            enemy.abilityState = 'phase2AoeWarn'; enemy.abilityDuration = 1.2;
-                            enemy.warnX = playerX; enemy.warnY = playerY;
-                            showCenterMessage("ВОРДЕН (ФАЗА 2): ТРОЙНОЙ ВЗРЫВ!");
+                            enemy.abilityState = 'phase2OpenWarn'; enemy.abilityDuration = 1.2;
+                            // BULLET-HELL: взрывы теперь расходятся по кругу ОТ БОССА, а не бьют по игроку,
+                            // поэтому телеграф-кольцо тоже центрируем на боссе, а не на позиции игрока.
+                            enemy.warnX = enemy.x; enemy.warnY = enemy.y;
+                            showCenterMessage("ВОРДЕН (ФАЗА 2): РАДИАЛЬНЫЙ ВЗРЫВ!");
                         } else {
-                            // ФАЗА 2: AoE-взрыв ВСЕГДА тройной (баг-фикс — раньше тройным был только
-                            // взрыв-открытие, а последующие AoE-атаки в Фазе 2 ошибочно шли через
-                            // одиночную ветку 'warn', как в Фазе 1).
-                            const aoeState = enemy.phase === 2 ? 'phase2AoeWarn' : 'warn';
-                            enemy.abilityState = Math.random() < 0.5 ? 'voidCharge' : aoeState;
+                            enemy.abilityState = Math.random() < 0.5 ? 'voidCharge' : 'warn';
                             if (enemy.abilityState === 'voidCharge') {
-                                // ФАЗА 2: лазер теперь целится в игрока (не веером), поэтому даём
-                                // игроку больше времени на реакцию — телеграф длиннее на
-                                // BOSS_PHASE2_LASER_WINDUP_BONUS секунд.
-                                enemy.abilityDuration = WARDEN_BEAM_CHARGE_TIME + (enemy.phase === 2 ? BOSS_PHASE2_LASER_WINDUP_BONUS : 0);
-                                enemy.abilityDurationTotal = enemy.abilityDuration;
-                                showCenterMessage(enemy.phase === 2 ? "ВОРДЕН: ЗАРЯЖАЕТ ЛАЗЕР..." : "ВОРДЕН: ЗАРЯЖАЕТ ЛУЧ ПУСТОТЫ...");
-                            } else if (enemy.abilityState === 'phase2AoeWarn') {
-                                enemy.abilityDuration = 1.2; enemy.warnX = playerX; enemy.warnY = playerY; showCenterMessage("ВОРДЕН (ФАЗА 2): ТРОЙНОЙ ВЗРЫВ!");
+                                enemy.abilityDuration = WARDEN_BEAM_CHARGE_TIME;
+                                showCenterMessage(enemy.phase === 2 ? "ВОРДЕН: ЗАРЯЖАЕТ ОМНИ-ЛАЗЕР..." : "ВОРДЕН: ЗАРЯЖАЕТ ЛУЧ ПУСТОТЫ...");
                             } else {
                                 enemy.abilityDuration = 1.2; enemy.warnX = playerX; enemy.warnY = playerY; showCenterMessage("ВОРДЕН: ЗЕМЛЯНОЙ ВЗРЫВ!");
                             }
@@ -4021,25 +4200,39 @@ function update(dt) {
                         enemy.abilityDuration -= dt;
                         if (enemy.abilityDuration <= 0) {
                             // ЛАЗЕР ОЧЕРЕДЬЮ: 5 быстрых последовательных выстрелов вместо одного
-                            // непрерывного луча. И в Фазе 1, и в Фазе 2 — каждый выстрел заново
-                            // нацеливается на ТЕКУЩУЮ позицию игрока прямо перед выстрелом
+                            // непрерывного луча. В Фазе 1 — по игроку, в Фазе 2 — веером по кругу
                             // (см. fireBossLaserShot / BOSS_LASER_SHOT_*).
                             enemy.abilityState = 'laserBurst';
                             enemy.laserShotsFired = 0;
                             enemy.laserShotTimer = 0; // первый выстрел очереди — сразу на этом кадре
-                            showCenterMessage(enemy.phase === 2 ? "ВОРДЕН: ЛАЗЕР ПО ИГРОКУ!" : "ВОРДЕН: ЛАЗЕР!");
+                            showCenterMessage(enemy.phase === 2 ? "ВОРДЕН: ОМНИ-ЛАЗЕР!" : "ВОРДЕН: ЛАЗЕР!");
                         }
                     } else if (enemy.abilityState === 'laserBurst') {
-                        enemy.laserShotTimer -= dt;
-                        if (enemy.laserShotTimer <= 0 && enemy.laserShotsFired < BOSS_LASER_SHOT_COUNT) {
-                            // radial больше не используется ни в одной фазе — луч ВСЕГДА нацелен на
-                            // игрока, и позиция для наведения берётся заново на каждый выстрел.
-                            fireBossLaserShot(enemy, enemy.laserShotsFired);
-                            enemy.laserShotsFired++;
-                            enemy.laserShotTimer = BOSS_LASER_SHOT_INTERVAL;
-                        }
-                        if (enemy.laserShotsFired >= BOSS_LASER_SHOT_COUNT) {
-                            enemy.abilityState = 'idle'; enemy.abilityTimer = 5 + Math.random() * 3;
+                        if (enemy.phase === 2) {
+                            // BULLET-HELL: 25 лучей в очень быстрой радиальной последовательности (пара штук
+                            // за кадр, а не растянутая очередь) — равномерно на 360° вокруг босса, НЕ по игроку.
+                            enemy.laserShotTimer -= dt;
+                            const shotsPerTick = 3; // несколько лучей за кадр -> "почти одновременно"
+                            while (enemy.laserShotTimer <= 0 && enemy.laserShotsFired < BOSS_PHASE2_LASER_COUNT) {
+                                for (let k = 0; k < shotsPerTick && enemy.laserShotsFired < BOSS_PHASE2_LASER_COUNT; k++) {
+                                    fireBossLaserShot(enemy, true, enemy.laserShotsFired, BOSS_PHASE2_LASER_COUNT);
+                                    enemy.laserShotsFired++;
+                                }
+                                enemy.laserShotTimer += BOSS_LASER_SHOT_INTERVAL;
+                            }
+                            if (enemy.laserShotsFired >= BOSS_PHASE2_LASER_COUNT) {
+                                enemy.abilityState = 'idle'; enemy.abilityTimer = 5 + Math.random() * 3;
+                            }
+                        } else {
+                            enemy.laserShotTimer -= dt;
+                            if (enemy.laserShotTimer <= 0 && enemy.laserShotsFired < BOSS_LASER_SHOT_COUNT) {
+                                fireBossLaserShot(enemy, false, enemy.laserShotsFired, BOSS_LASER_SHOT_COUNT);
+                                enemy.laserShotsFired++;
+                                enemy.laserShotTimer = BOSS_LASER_SHOT_INTERVAL;
+                            }
+                            if (enemy.laserShotsFired >= BOSS_LASER_SHOT_COUNT) {
+                                enemy.abilityState = 'idle'; enemy.abilityTimer = 5 + Math.random() * 3;
+                            }
                         }
                     } else if (enemy.abilityState === 'warn') {
                         enemy.abilityDuration -= dt;
@@ -4051,24 +4244,27 @@ function update(dt) {
                     } else if (enemy.abilityState === 'explode') {
                         enemy.abilityDuration -= dt;
                         if (enemy.abilityDuration <= 0) { enemy.abilityState = 'idle'; enemy.abilityTimer = 5 + Math.random() * 3; }
-                    } else if (enemy.abilityState === 'phase2AoeWarn') {
-                        // ТЕЛЕГРАФ AoE-ВЗРЫВА В ФАЗЕ 2 — та же пауза перед взрывом, что и у обычного
+                    } else if (enemy.abilityState === 'phase2OpenWarn') {
+                        // ТЕЛЕГРАФ ОТКРЫТИЯ ФАЗЫ 2 — та же пауза перед взрывом, что и у обычного
                         // земляного взрыва, но по завершении запускает ТРИ взрыва подряд, а не один.
-                        // Используется КАЖДЫЙ раз, когда Фаза 2 выбирает AoE-взрыв — не только при
-                        // открытии фазы.
                         enemy.abilityDuration -= dt;
                         if (enemy.abilityDuration <= 0) {
-                            enemy.abilityState = 'phase2AoeExplode';
+                            enemy.abilityState = 'phase2OpenExplode';
                             enemy.phase2AoeShotsFired = 0;
                             enemy.phase2AoeShotTimer = 0; // первый из трёх взрывов — сразу на этом кадре
                         }
-                    } else if (enemy.abilityState === 'phase2AoeExplode') {
-                        // ТРОЙНОЙ AoE-ВЗРЫВ: 3 взрыва с небольшой задержкой между ними, все на
-                        // позиции игрока, зафиксированной в момент завершения телеграфа (warnX/warnY).
+                    } else if (enemy.abilityState === 'phase2OpenExplode') {
+                        // BULLET-HELL: BOSS_PHASE2_AOE_COUNT (5) взрывов, распределённых РАВНОМЕРНО по кругу
+                        // на расстоянии BOSS_PHASE2_AOE_DISTANCE от босса (Math.cos/Math.sin от угла) —
+                        // радиальный AoE вокруг босса, а НЕ на позиции игрока. Небольшой стаггер между
+                        // взрывами сохранён для читаемости атаки (не обязательно строго один кадр).
                         enemy.phase2AoeShotTimer -= dt;
                         if (enemy.phase2AoeShotTimer <= 0 && enemy.phase2AoeShotsFired < BOSS_PHASE2_AOE_COUNT) {
-                            spawnBlueExplosion(enemy.warnX, enemy.warnY, 0.1);
-                            applyAoeDamage(enemy.warnX, enemy.warnY, BOSS_PHASE2_AOE_RADIUS, BOSS_PHASE2_AOE_DAMAGE, true);
+                            const aoeAngle = (Math.PI * 2 / BOSS_PHASE2_AOE_COUNT) * enemy.phase2AoeShotsFired;
+                            const aoeX = enemy.x + Math.cos(aoeAngle) * BOSS_PHASE2_AOE_DISTANCE;
+                            const aoeY = enemy.y + Math.sin(aoeAngle) * BOSS_PHASE2_AOE_DISTANCE;
+                            spawnBlueExplosion(aoeX, aoeY, 0.1);
+                            applyAoeDamage(aoeX, aoeY, BOSS_PHASE2_AOE_RADIUS, BOSS_PHASE2_AOE_DAMAGE, true);
                             enemy.phase2AoeShotsFired++;
                             enemy.phase2AoeShotTimer = BOSS_PHASE2_AOE_STAGGER;
                         }
@@ -4185,8 +4381,10 @@ function renderMinimap() {
         let mmX = (enemy.x / mapSize) * minimapCanvas.width; let mmY = (enemy.y / mapSize) * minimapCanvas.height;
         if (enemy.type === 'boss') { mctx.fillStyle = "#ff00ff"; mctx.fillRect(mmX - 4, mmY - 4, 8, 8); }
         else if (enemy.type === 'creeper') { mctx.fillStyle = "#00ff00"; mctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5); }
+        else if (enemy.type === 'eliteCreeper') { mctx.fillStyle = "#ff8800"; mctx.fillRect(mmX - 3.5, mmY - 3.5, 7, 7); }
         else if (enemy.type === 'flyer') { mctx.fillStyle = "#9fe0c0"; mctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5); }
         else if (enemy.type === 'swarm') { mctx.fillStyle = "#ff5050"; mctx.fillRect(mmX - 1.5, mmY - 1.5, 3, 3); }
+        else if (enemy.type === 'bigSkeleton') { mctx.fillStyle = "#ff2222"; mctx.fillRect(mmX - 3.5, mmY - 3.5, 7, 7); }
         else { mctx.fillStyle = "#ffff00"; mctx.fillRect(mmX - 2.5, mmY - 2.5, 5, 5); }
     });
     let playerMMX = (playerX / mapSize) * minimapCanvas.width; let playerMMY = (playerY / mapSize) * minimapCanvas.height;
