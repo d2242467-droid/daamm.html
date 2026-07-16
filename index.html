@@ -2494,8 +2494,6 @@ function restartGame() {
     updateGrenadeUi(); updateMedkitUi(); updateWeaponVisibility(); gameState = 'PLAYING'; initAudio(); updateDifficultyUi(); canvas.requestPointerLock();
 }
 
-WaveManager.startNextWave();
-
 const keys = {};
 window.addEventListener('keydown', e => {
     if (e.code === 'KeyE') { toggleShop(); return; }
