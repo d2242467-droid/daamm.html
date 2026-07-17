@@ -1129,6 +1129,20 @@ const MAX_MAP_COINS = 14;
 const COIN_RESPAWN_INTERVAL = 16; // секунд между волнами подсадки новых монет
 let coinRespawnTimer = COIN_RESPAWN_INTERVAL;
 
+// ==========================================================================
+// ЛУТ-ЯЩИКИ (CRATE): статичные разрушаемые объекты. НЕ двигаются, НЕ атакуют,
+// НЕ попадают в массив enemies -> враги/боссы никогда не выбирают их целью и
+// не учитывают их при поиске пути (см. enemyCanOccupy/AI ниже - crates туда
+// не заходят). Живут в собственном массиве и собственной ветке
+// syncEntitiesWith3DScene(), но урон им наносится ИЗ ТЕХ ЖЕ функций, что бьют
+// врагов (checkHit, fireGaussChargedShot, applyAoeDamage/explodeInRadius) -
+// см. пометки "ЛУТ-ЯЩИКИ:" в этих функциях ниже.
+// ==========================================================================
+let crates = [];
+const CRATE_MAX_HP = 80;         // 50-100 HP, как и просили в требованиях
+const CRATE_AMMO_REWARD = 50;    // +50 патронов при разрушении
+const CRATE_PICKUP_RADIUS_HINT = 0.4; // приблизительный "радиус" ящика для попаданий/AoE
+
 // ФУНКЦИЯ ДОБАВЛЕНИЯ НАПРАВЛЕННОГО ИНДИКАТОРА УРОНА (ДУГА ВОКРУГ ПРИЦЕЛА)
 function addDamageIndicator(sourceAngle) {
     let relAngle = sourceAngle - playerAngle;
@@ -1863,6 +1877,21 @@ function buildPickupMesh(type) {
     return group;
 }
 
+// ЛУТ-ЯЩИК: деревянный ящик (корпус + две диагональные "доски"-крестовины на лицевой
+// стороне), чтобы визуально отличаться от обычных pickup-предметов на полу.
+function buildCrateMesh() {
+    const group = new THREE.Group();
+    const woodMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
+    const plankMat = new THREE.MeshLambertMaterial({ color: 0x6b4423 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), woodMat);
+    group.add(body);
+    const plankA = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.1, 0.02), plankMat);
+    plankA.rotation.z = Math.PI / 4; plankA.position.z = 0.36; group.add(plankA);
+    const plankB = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.1, 0.02), plankMat);
+    plankB.rotation.z = -Math.PI / 4; plankB.position.z = 0.36; group.add(plankB);
+    return group;
+}
+
 function buildProjectileMesh() { return new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffcc00 })); }
 
 // КОСТЯНОЙ СНАРЯД СКЕЛЕТА-СТРЕЛКА: маленькая светящаяся "кость" (цилиндр-стержень + два
@@ -2043,6 +2072,26 @@ function syncEntitiesWith3DScene() {
         if (!mesh) { mesh = buildPickupMesh(pickup.type); scene.add(mesh); entityMeshes.set(pickup._meshId, mesh); }
         mesh.position.set(pickup.x, 0.15 + Math.sin(pickup.bounceTimer) * 0.05, pickup.y);
         mesh.rotation.y = time * 1.5; pickup.bounceTimer += 0.04;
+    });
+
+    // ЛУТ-ЯЩИКИ: статичная позиция (не двигаются), но с полоской здоровья как у врагов,
+    // чтобы игрок видел прогресс разрушения.
+    crates.forEach(crate => {
+        if (!crate._meshId) crate._meshId = 'crate_' + Math.random().toString(36).substr(2, 9);
+        activeMeshIds.add(crate._meshId);
+        let entityData = entityMeshes.get(crate._meshId);
+        if (!entityData) {
+            const mesh = buildCrateMesh(); scene.add(mesh);
+            mesh.userData.gaussCrateId = crate._meshId; // метка для луча Гаусс-винтовки (см. resolveCrateIdFromObject)
+            const healthBar = create3DHealthBar('crate'); scene.add(healthBar);
+            entityData = { mesh: mesh, healthBar: healthBar };
+            entityMeshes.set(crate._meshId, entityData);
+        }
+        entityData.mesh.position.set(crate.x, 0.35, crate.y);
+        const fg = entityData.healthBar.userData.fg;
+        fg.scale.x = Math.max(0, Math.min(1, crate.health / crate.maxHealth));
+        entityData.healthBar.position.set(crate.x, 0.85, crate.y);
+        entityData.healthBar.quaternion.copy(camera.quaternion);
     });
 
     particles.forEach(part => {
@@ -2385,6 +2434,79 @@ function spawnMapCoins(count) {
     }
 }
 
+// ==========================================================================
+// ЛУТ-ЯЩИКИ (CRATE): СПАВН, УРОН, РАЗРУШЕНИЕ
+// ==========================================================================
+
+// Размещает `count` ящиков на случайных ОТКРЫТЫХ клетках карты — та же логика,
+// что и spawnMapCoins() (не в стенах/воде/кустах, не поверх игрока/предметов/
+// других ящиков). Ящики НЕ попадают в `map` и НЕ помечаются как твёрдые клетки,
+// поэтому AI/пути врагов и босса их полностью игнорируют (см. требование
+// "не мешать pathfinding-у").
+function spawnCrates(count) {
+    let placed = 0; let attempts = 0;
+    while (placed < count && attempts < count * 40) {
+        attempts++;
+        const gx = 1 + Math.floor(Math.random() * (mapSize - 2));
+        const gy = 1 + Math.floor(Math.random() * (mapSize - 2));
+        if (map[gy * mapSize + gx] !== 0) continue; // только открытый пол
+        const cx = gx + 0.5, cy = gy + 0.5;
+        if (Math.hypot(cx - playerX, cy - playerY) < 3) continue; // не прямо на игроке при старте
+        if (pickups.some(p => Math.hypot(p.x - cx, p.y - cy) < 1.2)) continue; // не поверх предметов
+        if (crates.some(c => Math.hypot(c.x - cx, c.y - cy) < 1.5)) continue;  // не поверх других ящиков
+        crates.push({ x: cx, y: cy, health: CRATE_MAX_HP, maxHealth: CRATE_MAX_HP });
+        placed++;
+    }
+}
+
+// Также можно РАЗМЕЩАТЬ ЯЩИКИ ВРУЧНУЮ (заранее заданные точки), например сразу
+// после spawnCrates(...) в startGame()/restartGame():
+//   crates.push({ x: 5.5, y: 5.5, health: CRATE_MAX_HP, maxHealth: CRATE_MAX_HP });
+
+// ЕДИНАЯ ТОЧКА ВХОДА ДЛЯ УРОНА ПО ЯЩИКУ — вызывается из тех же мест, что бьют
+// врагов (checkHit, fireGaussChargedShot, applyAoeDamage/explodeInRadius).
+// Аналог `enemy.health -= dmg`, но с немедленной обработкой "смерти": ящик
+// статичен, ему не нужен отдельный проход crates.filter(...) в update() на
+// каждый кадр, как у enemies.
+function damageCrate(crate, dmg) {
+    if (crate.health <= 0) return;
+    crate.health -= dmg;
+    spawnCrateDebris(crate.x, crate.y, 4);
+    if (crate.health <= 0) destroyCrate(crate);
+}
+
+// РАЗРУШЕНИЕ ЯЩИКА: убираем из мира + меш/полоску здоровья со сцены, визуальный
+// эффект (разлетающиеся щепки) и выдача лута — +50 патронов и ПОЛНОЕ восстановление HP.
+function destroyCrate(crate) {
+    crates = crates.filter(c => c !== crate);
+    const entityData = entityMeshes.get(crate._meshId);
+    if (entityData) {
+        scene.remove(entityData.mesh);
+        if (entityData.healthBar) scene.remove(entityData.healthBar);
+        entityMeshes.delete(crate._meshId);
+    }
+    spawnCrateDebris(crate.x, crate.y, 14);
+
+    // ЛУТ: +50 патронов (с тем же лимитом 200, что и у обычных pickup'ов патронов)
+    // и ПОЛНОЕ восстановление здоровья игрока.
+    ammo = Math.min(200, ammo + CRATE_AMMO_REWARD); ammoUi.innerText = ammo;
+    health = maxHealth; healthUi.innerText = health;
+    playPickupSound();
+    showCenterMessage(`ЯЩИК РАЗБИТ! +${CRATE_AMMO_REWARD} ПАТРОНОВ, ЗДОРОВЬЕ ВОССТАНОВЛЕНО!`);
+}
+
+// Разлетающиеся деревянные щепки (переиспользует общую систему particles,
+// физика падения — см. правку `p.type === 'blood' || p.type === 'debris'` в update()).
+function spawnCrateDebris(x, y, count = 6) {
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: x + (Math.random() - 0.5) * 0.3, y: y + (Math.random() - 0.5) * 0.3, z: 0.2 + Math.random() * 0.5,
+            vx: (Math.random() - 0.5) * 2.5, vy: (Math.random() - 0.5) * 2.5, vz: 1 + Math.random() * 3,
+            color: 0x8b5a2b, size: 3 + Math.random() * 3, life: 1.0, type: 'debris'
+        });
+    }
+}
+
 // ПРОВЕРКА КОЛЛИЗИИ С УЧЕТОМ РАЗМЕРА ВРАГА (проверяем все 4 угла его "коробки", а не только центр)
 function enemyCanOccupy(x, y, radius, isFlying) {
     const minX = x - radius, maxX = x + radius;
@@ -2448,6 +2570,7 @@ function startGame(chosenDifficulty, chosenMapKey) {
     playerX = spawn.x; playerY = spawn.y; playerAngle = 0.0; playerPitch = 0.0;
     stamina = STAMINA_MAX; isSprinting = false; isShieldActive = false; updateStaminaUi();
     pickups = pickups.filter(p => p.type !== 'coin'); spawnMapCoins(MAX_MAP_COINS); coinRespawnTimer = COIN_RESPAWN_INTERVAL;
+    crates = []; spawnCrates(6); // ЛУТ-ЯЩИКИ: 6 штук на карте за забег
     screenShakeTimer = 0; damageVignetteTimer = 0;
     const dvEl = document.getElementById("damage-vignette"); if (dvEl) dvEl.style.opacity = 0;
     initAudio(); document.getElementById("start-overlay").style.display = 'none';
@@ -2486,8 +2609,9 @@ function restartGame() {
     grenadeCounts = { frag: 0, molotov: 0, flash: 0 }; currentGrenadeType = 'frag'; thrownGrenades = []; fireZones = [];
     medkitCount = 0; medkitUnlocked = false; medkitHealAmount = 20;
     tracers.forEach(t => { if (scene) { scene.remove(t.mesh); if (t.extraMesh) scene.remove(t.extraMesh); } }); tracers = [];
-    enemies = []; projectiles = []; particles = []; pickups = [];
+    enemies = []; projectiles = []; particles = []; pickups = []; crates = [];
     spawnMapCoins(MAX_MAP_COINS); coinRespawnTimer = COIN_RESPAWN_INTERVAL;
+    spawnCrates(6); // ЛУТ-ЯЩИКИ: 6 штук на карте за забег
     bossUi.style.display = "none"; document.getElementById("death-overlay").style.display = 'none'; document.getElementById("shop-overlay").style.display = 'none';
     WaveManager.reset(); WaveManager.startNextWave();
     healthUi.innerText = health; scoreUi.innerText = score; ammoUi.innerText = ammo; weaponUi.innerText = "ДРОБОВИК [1] (2/2)"; reloadUi.innerText = "";
@@ -2738,6 +2862,14 @@ function applyAoeDamage(ex, ey, radius, dmg, includePlayer) {
             if (multiplayer.enabled && enemy.id) sendNetworkHit(enemy.id, currentDmg);
         }
     });
+    // ЛУТ-ЯЩИКИ: та же зона поражения, что и для врагов (взрыв ракеты/гранаты/гаусс-AoE).
+    crates.forEach(crate => {
+        let dist = Math.hypot(crate.x - ex, crate.y - ey);
+        if (dist < radius) {
+            let falloff = 1.0 - (dist / radius);
+            damageCrate(crate, dmg * falloff);
+        }
+    });
     if (includePlayer) {
         let distToPlayer = Math.hypot(playerX - ex, playerY - ey);
         if (distToPlayer < radius) {
@@ -2969,12 +3101,33 @@ function getEnemyMeshesForRaycast() {
     return list;
 }
 
+// ЛУТ-ЯЩИКИ: тот же принцип, что и getEnemyMeshesForRaycast() выше, но для crates -
+// меши помечены userData.gaussCrateId (см. ветку crates.forEach в syncEntitiesWith3DScene()).
+function getCrateMeshesForRaycast() {
+    const list = [];
+    crates.forEach(crate => {
+        const entityData = entityMeshes.get(crate._meshId);
+        if (entityData && entityData.mesh) list.push(entityData.mesh);
+    });
+    return list;
+}
+
 // Луч intersectObjects() бьёт по дочерним мешам (руки/тело/т.д.), поэтому поднимаемся
 // по цепочке .parent, пока не найдём объект с меткой gaussEnemyId (корень врага).
 function resolveEnemyIdFromObject(obj) {
     let o = obj;
     while (o) {
         if (o.userData && o.userData.gaussEnemyId) return o.userData.gaussEnemyId;
+        o = o.parent;
+    }
+    return null;
+}
+
+// То же самое, но для ЛУТ-ЯЩИКОВ (userData.gaussCrateId).
+function resolveCrateIdFromObject(obj) {
+    let o = obj;
+    while (o) {
+        if (o.userData && o.userData.gaussCrateId) return o.userData.gaussCrateId;
         o = o.parent;
     }
     return null;
@@ -3009,16 +3162,18 @@ function fireGaussChargedShot(chargePct) {
         if (wallHits.length) wallDist = wallHits[0].distance;
     }
 
-    // Все враги, пересечённые лучом (отсортированы по дальности, без дублей по врагу)
-    const enemyMeshes = getEnemyMeshesForRaycast();
-    const rawHits = enemyMeshes.length ? gaussRaycaster.intersectObjects(enemyMeshes, true) : [];
+    // Все враги И ящики, пересечённые лучом (отсортированы по дальности, без дублей по цели)
+    const raycastTargets = getEnemyMeshesForRaycast().concat(getCrateMeshesForRaycast());
+    const rawHits = raycastTargets.length ? gaussRaycaster.intersectObjects(raycastTargets, true) : [];
     const seen = new Set();
-    const pierced = []; // [{ enemyId, dist }]
+    const pierced = []; // [{ enemyId, crateId, dist }]
     for (const hit of rawHits) {
         if (hit.distance > wallDist) continue; // стена блокирует всё, что дальше неё
         const enemyId = resolveEnemyIdFromObject(hit.object);
-        if (!enemyId || seen.has(enemyId)) continue;
-        seen.add(enemyId); pierced.push({ enemyId, dist: hit.distance });
+        const crateId = enemyId ? null : resolveCrateIdFromObject(hit.object);
+        const id = enemyId || crateId;
+        if (!id || seen.has(id)) continue;
+        seen.add(id); pierced.push({ enemyId, crateId, dist: hit.distance });
     }
     pierced.sort((a, b) => a.dist - b.dist);
 
@@ -3033,14 +3188,23 @@ function fireGaussChargedShot(chargePct) {
         return;
     }
 
-    // Для остальных уровней заряда луч ВСЕГДА пробивает всех врагов на пути и летит до стены
-    for (const { enemyId } of pierced) {
-        const target = enemies.find(e => e._meshId === enemyId);
-        if (!target) continue;
+    // Для остальных уровней заряда луч ВСЕГДА пробивает всех врагов/ящики на пути и летит до стены
+    for (const { enemyId, crateId } of pierced) {
         let dmg;
         if (chargePct < 50) dmg = (GAUSS_TIER2_DAMAGE) * damageMultiplier;
         else if (chargePct < 70) dmg = (BASE_GAUSS_DAMAGE) * damageMultiplier;
         else dmg = (BASE_GAUSS_DAMAGE * GAUSS_TIER4_PIERCE_MULT) * damageMultiplier;
+
+        // ЛУТ-ЯЩИКИ: та же пробивная логика луча, что и для врагов, но через damageCrate() -
+        // ящик не получает AoE-разряд снайпер-тира (30%-50%), т.к. у него нет "соседей", которым
+        // это могло бы быть интересно; splash по врагам вокруг него применяется как обычно.
+        if (crateId) {
+            const crateTarget = crates.find(c => c._meshId === crateId);
+            if (crateTarget) damageCrate(crateTarget, dmg);
+            continue;
+        }
+        const target = enemies.find(e => e._meshId === enemyId);
+        if (!target) continue;
         target.health -= dmg;
         spawnBlood(target.x, target.y, dmg / 4);
         registerBossDamage(target, dmg);
@@ -3338,6 +3502,16 @@ function applyConeDamage(range, halfAngle, dmgPerSecond, dt, appliesBurning) {
         // СБРАСЫВАЕТ таймер горения обратно на полную длительность (не складывается).
         if (appliesBurning) enemy.burningTimer = BURNING_DURATION;
     });
+    // ЛУТ-ЯЩИКИ: та же конусная проверка дальности/угла, что и для врагов.
+    crates.forEach(crate => {
+        const dx = crate.x - playerX; const dy = crate.y - playerY; const dist = Math.hypot(dx, dy);
+        if (dist > range) return;
+        let angleToCrate = Math.atan2(dy, dx);
+        let diff = angleToCrate - playerAngle;
+        while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2;
+        if (Math.abs(diff) > halfAngle) return;
+        damageCrate(crate, dmgPerSecond * dt);
+    });
     const distToPlayerIrrelevant = null; // огнемёт не наносит урон игроку-стрелку
 }
 
@@ -3503,7 +3677,7 @@ function calculateDamage(baseDamage, position, targetPosition, weaponType) {
 function checkHit(fovSpread, damage, maxRange, useTracer, weaponType) {
     maxRange = maxRange || Infinity;
     if (useTracer === undefined) useTracer = true;
-    const rayAngle = playerAngle; let hitTarget = null; let minEnemyDist = Infinity;
+    const rayAngle = playerAngle; let hitTarget = null; let hitIsCrate = false; let minEnemyDist = Infinity;
     function hasLineOfSight(enemy) {
         const dx = enemy.x - playerX; const dy = enemy.y - playerY; const dist = Math.hypot(dx, dy);
         const steps = Math.max(10, Math.floor(dist / 0.05)); const stepX = dx / steps; const stepY = dy / steps;
@@ -3528,11 +3702,28 @@ function checkHit(fovSpread, damage, maxRange, useTracer, weaponType) {
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2; while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         if (angleDiff < fovSpread || angleDiff > Math.PI * 2 - fovSpread) {
             let dist = Math.hypot(enemy.x - playerX, enemy.y - playerY);
-            if (dist <= maxRange && dist < minEnemyDist && hasLineOfSight(enemy)) { minEnemyDist = dist; hitTarget = enemy; }
+            if (dist <= maxRange && dist < minEnemyDist && hasLineOfSight(enemy)) { minEnemyDist = dist; hitTarget = enemy; hitIsCrate = false; }
         }
     });
 
-    if (hitTarget) {
+    // ЛУТ-ЯЩИКИ: та же проверка угла/дальности/видимости, что и для врагов -
+    // ящик побеждает, только если он БЛИЖЕ уже найденного врага (обычный
+    // приоритет "что ближе, в то и попали" для хитскан-оружия).
+    crates.forEach(crate => {
+        let crateAngle = Math.atan2(crate.y - playerY, crate.x - playerX);
+        let angleDiff = Math.abs(crateAngle - rayAngle);
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2; while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        if (angleDiff < fovSpread || angleDiff > Math.PI * 2 - fovSpread) {
+            let dist = Math.hypot(crate.x - playerX, crate.y - playerY);
+            if (dist <= maxRange && dist < minEnemyDist && hasLineOfSight(crate)) { minEnemyDist = dist; hitTarget = crate; hitIsCrate = true; }
+        }
+    });
+
+    if (hitTarget && hitIsCrate) {
+        // Ящик не имеет brackets/резист-множителей оружия - берём "сырой" урон
+        // как для обычного попадания по врагу без учёта хедшотов/дистанции.
+        damageCrate(hitTarget, damage);
+    } else if (hitTarget) {
         const shooterPos = new THREE.Vector3(playerX, playerZ, playerY);
         const targetPos = new THREE.Vector3(hitTarget.x, hitTarget.z || 0, hitTarget.y);
         const finalDamage = calculateDamage(damage, shooterPos, targetPos, weaponType);
@@ -3845,6 +4036,13 @@ function update(dt) {
                 spawnExplosion(p.x, p.y, p.z); explodeInRadius(p.x, p.y, p.damage); return false;
             }
         }
+        // ЛУТ-ЯЩИКИ: прямое попадание летящей ракеты в ящик (мало ящиков на карте -
+        // отдельный spatial hash для них избыточен, просто перебираем массив).
+        for (let crate of crates) {
+            if (Math.hypot(crate.x - p.x, crate.y - p.y) < 0.45) {
+                spawnExplosion(p.x, p.y, p.z); explodeInRadius(p.x, p.y, p.damage); return false;
+            }
+        }
         return true;
     });
 
@@ -3858,6 +4056,11 @@ function update(dt) {
                 registerBossDamage(enemy, currentDmg);
                 if (multiplayer.enabled && enemy.id) sendNetworkHit(enemy.id, currentDmg);
             }
+        });
+        // ЛУТ-ЯЩИКИ: прямое попадание ракеты/гранаты в ящик или взрыв рядом с ним.
+        crates.forEach(crate => {
+            let dist = Math.hypot(crate.x - ex, crate.y - ey);
+            if (dist < 3.2) { damageCrate(crate, dmg * (1.0 - (dist / 3.2))); }
         });
         let distToPlayer = Math.hypot(playerX - ex, playerY - ey);
         if (distToPlayer < 2.5) {
@@ -3982,7 +4185,7 @@ function update(dt) {
 
     particles = particles.filter(p => {
         p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
-        if (p.type === 'blood') { p.vz -= GRAVITY * 0.5 * dt; if (p.z <= 0) { p.z = 0; p.vx = 0; p.vy = 0; p.vz = 0; } }
+        if (p.type === 'blood' || p.type === 'debris') { p.vz -= GRAVITY * 0.5 * dt; if (p.z <= 0) { p.z = 0; p.vx = 0; p.vy = 0; p.vz = 0; } }
         return p.life > 0;
     });
 
